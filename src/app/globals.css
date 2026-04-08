@@ -1,146 +1,210 @@
 @import 'tailwindcss';
 
 @theme {
-  --font-sans: var(--font-jakarta), system-ui, sans-serif;
+  --font-sans:    var(--font-jakarta), system-ui, sans-serif;
   --font-display: var(--font-bebas), sans-serif;
-  --font-alt: var(--font-calistoga), serif;
+  --font-alt:     var(--font-calistoga), serif;
+  --font-mono:    var(--font-mono), "Roboto Mono", monospace;
 }
 
-/* ────────────────────────────────────────
-   GOLD DARK EDITION — default theme
-   Based on AIOXSquad Brandbook Gold Edition
-─────────────────────────────────────────── */
+/* ══════════════════════════════════════════════════════════════
+   NOTREGLR — Gold Dark Edition (default)
+   Based on AIOXSquad Brandbook v2.0 — Gold Edition
+   Source: https://brand.aioxsquad.ai/brandbook/
+   Accent: #DDD1BB (Gold) replaces original Lime #D1FF00
+══════════════════════════════════════════════════════════════ */
 :root {
-  /* Accent — Gold */
-  --brand:       #DDD1BB;
-  --brand-hover: #E8DFD0;
-  --brand-dim:   rgba(221, 209, 187, 0.12);
-  --brand-glow:  rgba(221, 209, 187, 0.25);
-  --brand-dark:  #C4B7A2;
+  /* ── BRAND ACCENT (Gold) ─────────────────────────── */
+  --brand:          #DDD1BB;
+  --brand-hover:    #E8DFD0;
+  --brand-dark:     #C4B7A2;
+  --brand-dim:      rgba(221,209,187,0.12);
+  --brand-glow:     rgba(221,209,187,0.25);
+  --brand-glow-soft: rgba(221,209,187,0.10);
 
-  /* Canvas / Surfaces */
-  --bg:              #09090A;
-  --surface:         #151517;
-  --surface-2:       #1D1D20;
-  --surface-3:       #222225;
-  --surface-hover:   #28282C;
-  --surface-panel:   #18181B;
-  --surface-console: #222225;
+  /* ── ACCENT OPACITY LADDER ───────────────────────── */
+  --accent-02:  rgba(221,209,187,0.02);
+  --accent-05:  rgba(221,209,187,0.05);
+  --accent-08:  rgba(221,209,187,0.08);
+  --accent-10:  rgba(221,209,187,0.10);
+  --accent-12:  rgba(221,209,187,0.12);
+  --accent-15:  rgba(221,209,187,0.15);
+  --accent-20:  rgba(221,209,187,0.20);
+  --accent-25:  rgba(221,209,187,0.25);
+  --accent-40:  rgba(221,209,187,0.40);
 
-  /* Borders */
-  --border:       rgba(255, 255, 255, 0.09);
-  --border-2:     rgba(255, 255, 255, 0.15);
-  --border-soft:  rgba(255, 255, 255, 0.05);
-  --border-input: rgba(255, 255, 255, 0.12);
-  --border-hover: rgba(255, 255, 255, 0.18);
+  /* ── SURFACE STACK (6-level elevation) ──────────── */
+  --bg:               #09090A;   /* Level 0 — canvas */
+  --bg-dark:          #121213;   /* Level 1 — shell */
+  --surface:          #151517;   /* Level 2 — cards, panels */
+  --surface-2:        #1D1D20;   /* Level 3 — nested */
+  --surface-panel:    #18181B;   /* Level 4 — sidebar */
+  --surface-3:        #222225;   /* Level 5 — console/terminal */
+  --surface-hover:    #28282C;   /* Level 6 — hover highlight */
+  --surface-overlay:  rgba(15,15,17,0.92); /* modal overlay */
 
-  /* Text hierarchy */
+  /* ── BORDERS ─────────────────────────────────────── */
+  --border:       rgba(255,255,255,0.09);
+  --border-soft:  rgba(255,255,255,0.05);
+  --border-2:     rgba(255,255,255,0.15);
+  --border-input: rgba(255,255,255,0.12);
+  --border-hover: rgba(255,255,255,0.18);
+
+  /* ── TEXT HIERARCHY ──────────────────────────────── */
   --text:   #F4F4F4;
   --text-2: #E8E8E8;
   --text-3: #AFAFAF;
   --text-4: #6E6E6E;
 
-  /* Fonts */
-  --font:         var(--font-jakarta), system-ui, sans-serif;
-  --font-display: var(--font-bebas), sans-serif;
-  --font-alt:     var(--font-calistoga), serif;
+  /* ── NEUTRAL SCALE ───────────────────────────────── */
+  --gray-charcoal: #313131;
+  --gray-dim:      #484848;
+  --gray-muted:    #6E6E6E;
+  --gray-silver:   #919191;
 
-  /* Radius scale */
-  --radius:     8px;
-  --radius-sm:  4px;
-  --radius-md:  8px;
-  --radius-lg:  12px;
-  --radius-xl:  16px;
-  --radius-full: 9999px;
-
-  /* Status */
+  /* ── SEMANTIC COLORS ─────────────────────────────── */
   --success: #4ade80;
   --error:   #f87171;
   --warning: #fbbf24;
   --info:    #60a5fa;
 
-  /* Z-layers */
+  --warning-bg:     rgba(245,158,11,0.05);
+  --warning-border: rgba(245,158,11,0.20);
+
+  /* ── GLOW / NEON ─────────────────────────────────── */
+  --neon:           #DDD1BB;
+  --neon-dim:       rgba(221,209,187,0.15);
+  --neon-glow:      rgba(221,209,187,0.40);
+  --focus-ring:     rgba(221,209,187,0.40);
+  --selection-bg:   #09090A;
+  --selection-fg:   #DDD1BB;
+
+  /* ── GLASS ───────────────────────────────────────── */
+  --glass-blur:      blur(10px);
+  --glass-blur-soft: blur(5px);
+
+  /* ── FONTS ───────────────────────────────────────── */
+  --font:         var(--font-jakarta), system-ui, sans-serif;
+  --font-display: var(--font-bebas), sans-serif;
+  --font-alt:     var(--font-calistoga), serif;
+  --font-mono:    var(--font-mono, "Roboto Mono"), monospace;
+
+  /* ── RADIUS SCALE ────────────────────────────────── */
+  --radius:     8px;
+  --radius-sm:  4px;
+  --radius-md:  8px;
+  --radius-lg:  12px;
+  --radius-xl:  16px;
+  --radius-2xl: 24px;
+  --radius-full: 9999px;
+
+  /* ── SPACING SCALE ───────────────────────────────── */
+  --space-0:   0px;
+  --space-1:   4px;
+  --space-2:   8px;
+  --space-3:   12px;
+  --space-4:   16px;
+  --space-5:   20px;
+  --space-6:   30px;
+  --space-7:   40px;
+  --space-8:   60px;
+  --space-9:   80px;
+  --space-10:  90px;
+  --space-11:  120px;
+  --gutter:    clamp(1rem, 3vw, 2rem);
+
+  /* ── Z-INDEX STACK ───────────────────────────────── */
   --layer-nav:      100;
   --layer-dropdown: 200;
   --layer-overlay:  300;
   --layer-modal:    400;
   --layer-toast:    500;
 
-  /* Spacing scale */
-  --space-1:  4px;
-  --space-2:  8px;
-  --space-3:  12px;
-  --space-4:  16px;
-  --space-5:  20px;
-  --space-6:  30px;
-  --space-7:  40px;
-  --space-8:  60px;
+  /* ── MOTION / EASING ─────────────────────────────── */
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-smooth: cubic-bezier(0.25, 0.1, 0.25, 1);
+  --ease-decel:  cubic-bezier(0, 0, 0.2, 1);
+  --duration-fast:   100ms;
+  --duration-base:   150ms;
+  --duration-slow:   250ms;
+  --duration-slower: 400ms;
 }
 
-/* ────────────────────────────────────────
+/* ══════════════════════════════════════════════════════════════
    LIGHT EDITION
-─────────────────────────────────────────── */
+══════════════════════════════════════════════════════════════ */
 html.light {
-  /* Accent — warm amber-gold (readable on white) */
-  --brand:       #7A5C1E;
-  --brand-hover: #5E4615;
-  --brand-dim:   rgba(122, 92, 30, 0.10);
-  --brand-glow:  rgba(122, 92, 30, 0.20);
-  --brand-dark:  #5E4615;
+  --brand:          #7A5C1E;
+  --brand-hover:    #5E4615;
+  --brand-dark:     #5E4615;
+  --brand-dim:      rgba(122,92,30,0.10);
+  --brand-glow:     rgba(122,92,30,0.20);
+  --brand-glow-soft: rgba(122,92,30,0.08);
 
-  /* Canvas / Surfaces */
-  --bg:              #F7F5F0;
-  --surface:         #FFFFFF;
-  --surface-2:       #F0EDE6;
-  --surface-3:       #E8E3DB;
-  --surface-hover:   #EDE8DF;
-  --surface-panel:   #F5F2EC;
-  --surface-console: #EAE6DF;
+  --accent-02:  rgba(122,92,30,0.02);
+  --accent-05:  rgba(122,92,30,0.05);
+  --accent-08:  rgba(122,92,30,0.08);
+  --accent-10:  rgba(122,92,30,0.10);
+  --accent-12:  rgba(122,92,30,0.12);
+  --accent-15:  rgba(122,92,30,0.15);
+  --accent-20:  rgba(122,92,30,0.20);
+  --accent-25:  rgba(122,92,30,0.25);
+  --accent-40:  rgba(122,92,30,0.40);
 
-  /* Borders */
-  --border:       rgba(0, 0, 0, 0.08);
-  --border-2:     rgba(0, 0, 0, 0.15);
-  --border-soft:  rgba(0, 0, 0, 0.04);
-  --border-input: rgba(0, 0, 0, 0.12);
-  --border-hover: rgba(0, 0, 0, 0.20);
+  --bg:               #F7F5F0;
+  --bg-dark:          #EDE9E0;
+  --surface:          #FFFFFF;
+  --surface-2:        #F0EDE6;
+  --surface-panel:    #F5F2EC;
+  --surface-3:        #EAE6DF;
+  --surface-hover:    #E8E3DB;
+  --surface-overlay:  rgba(247,245,240,0.92);
 
-  /* Text hierarchy */
+  --border:       rgba(0,0,0,0.08);
+  --border-soft:  rgba(0,0,0,0.04);
+  --border-2:     rgba(0,0,0,0.15);
+  --border-input: rgba(0,0,0,0.12);
+  --border-hover: rgba(0,0,0,0.20);
+
   --text:   #121213;
   --text-2: #28282C;
   --text-3: #6E6E6E;
   --text-4: #AFAFAF;
 
-  /* Status (same, readable on both) */
+  --gray-charcoal: #D0CCC4;
+  --gray-dim:      #C4C0B8;
+  --gray-muted:    #9E9A94;
+  --gray-silver:   #6E6A64;
+
   --success: #16a34a;
   --error:   #dc2626;
   --warning: #d97706;
   --info:    #2563eb;
+
+  --neon:       #7A5C1E;
+  --neon-dim:   rgba(122,92,30,0.15);
+  --neon-glow:  rgba(122,92,30,0.30);
+  --focus-ring: rgba(122,92,30,0.35);
+  --selection-bg: #F7F5F0;
+  --selection-fg: #7A5C1E;
 }
 
-/* ────────────────────────────────────────
-   BASE RESET & GLOBAL STYLES
-─────────────────────────────────────────── */
-*, *::before, *::after {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-}
+/* ══════════════════════════════════════════════════════════════
+   BASE RESET
+══════════════════════════════════════════════════════════════ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-html {
-  color-scheme: dark;
-}
-html.light {
-  color-scheme: light;
-}
+html             { color-scheme: dark; }
+html.light       { color-scheme: light; }
 
 body {
-  background:               var(--bg);
-  color:                    var(--text);
-  font-family:              var(--font);
-  font-size:                14px;
-  line-height:              1.5;
-  -webkit-font-smoothing:   antialiased;
-  -moz-osx-font-smoothing:  grayscale;
+  background:              var(--bg);
+  color:                   var(--text);
+  font-family:             var(--font);
+  font-size:               14px;
+  line-height:             1.5;
+  -webkit-font-smoothing:  antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 h1, h2, h3, h4, h5, h6 {
@@ -150,30 +214,260 @@ h1, h2, h3, h4, h5, h6 {
   line-height: 1.25;
 }
 
-input, textarea, select, button {
-  font-family: var(--font);
+a { color: var(--brand); text-decoration: none; }
+a:hover { color: var(--brand-hover); }
+
+input, textarea, select, button { font-family: var(--font); }
+
+::selection {
+  background: var(--selection-fg);
+  color:      var(--selection-bg);
 }
 
-a {
-  color: var(--brand);
+/* ══════════════════════════════════════════════════════════════
+   COMPONENT BASE CLASSES
+   (from AIOXSquad Brandbook — adapted to gold theme)
+══════════════════════════════════════════════════════════════ */
+
+/* ── BUTTONS ─────────────────────────────────────────────── */
+.btn {
+  display:         inline-flex;
+  align-items:     center;
+  justify-content: center;
+  gap:             0.375rem;
+  min-height:      36px;
+  padding:         0.5rem 1rem;
+  border:          1px solid transparent;
+  border-radius:   var(--radius-sm);
+  font-family:     var(--font-mono);
+  font-size:       11px;
+  font-weight:     500;
+  text-transform:  uppercase;
+  letter-spacing:  0.08em;
+  cursor:          pointer;
+  white-space:     nowrap;
+  transition:      background var(--duration-base) var(--ease-smooth),
+                   border-color var(--duration-base) var(--ease-smooth),
+                   color var(--duration-base) var(--ease-smooth),
+                   box-shadow var(--duration-base) var(--ease-smooth);
+}
+
+.btn-primary {
+  background: var(--brand);
+  color:      var(--bg-dark);
+  border-color: var(--brand-dark);
+}
+.btn-primary:hover {
+  background: var(--brand-hover);
+  box-shadow: 0 0 12px var(--brand-glow);
+}
+
+.btn-secondary {
+  background:   var(--surface-2);
+  color:        var(--text-2);
+  border-color: var(--border);
+}
+.btn-secondary:hover { border-color: var(--border-hover); background: var(--surface-hover); }
+
+.btn-ghost {
+  background:  transparent;
+  color:       var(--text-3);
+  border-color: transparent;
+}
+.btn-ghost:hover { color: var(--text); background: var(--accent-08); }
+
+.btn-destructive {
+  background: var(--error);
+  color:      #fff;
+}
+
+.btn:disabled { opacity: 0.4; cursor: not-allowed; pointer-events: none; }
+
+/* ── FORM INPUTS ─────────────────────────────────────────── */
+.form-input {
+  width:          100%;
+  background:     transparent;
+  border:         1px solid var(--border-input);
+  border-radius:  var(--radius-md);
+  color:          var(--text);
+  font-family:    var(--font);
+  font-size:      0.875rem;
+  padding:        0.625rem 0.875rem;
+  outline:        none;
+  transition:     border-color var(--duration-base) var(--ease-smooth),
+                  box-shadow var(--duration-base) var(--ease-smooth);
+}
+.form-input:focus {
+  border-color: var(--brand);
+  box-shadow:   0 0 0 2px var(--focus-ring);
+}
+.form-input::placeholder { color: var(--text-4); }
+
+.form-label {
+  display:        block;
+  font-family:    var(--font-mono);
+  font-size:      10px;
+  font-weight:    700;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  color:          var(--text-3);
+  margin-bottom:  6px;
+}
+
+/* ── CARDS ───────────────────────────────────────────────── */
+.card {
+  background:    var(--surface);
+  border:        1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow:      hidden;
+  transition:    border-color var(--duration-base) var(--ease-smooth),
+                 box-shadow var(--duration-base) var(--ease-smooth);
+}
+.card:hover {
+  border-color: var(--brand);
+  box-shadow:   0 2px 20px var(--brand-dim);
+}
+
+/* ── BADGES ──────────────────────────────────────────────── */
+.badge {
+  display:        inline-flex;
+  align-items:    center;
+  padding:        2px 8px;
+  border-radius:  var(--radius-full);
+  font-family:    var(--font-mono);
+  font-size:      10px;
+  font-weight:    500;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.badge-success { background: rgba(74,222,128,0.12); color: var(--success); }
+.badge-error   { background: rgba(248,113,113,0.12); color: var(--error); }
+.badge-warning { background: rgba(251,191,36,0.12);  color: var(--warning); }
+.badge-neutral { background: var(--accent-10);        color: var(--brand); }
+
+/* ── TABLES ──────────────────────────────────────────────── */
+.data-table {
+  width:           100%;
+  border-collapse: collapse;
+  font-size:       13px;
+}
+.data-table th {
+  font-family:    var(--font-mono);
+  font-size:      10px;
+  font-weight:    700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color:          var(--text-3);
+  padding:        10px 16px;
+  text-align:     left;
+  border-bottom:  1px solid var(--border-2);
+}
+.data-table td {
+  padding:       12px 16px;
+  border-bottom: 1px solid var(--border);
+  color:         var(--text-2);
+}
+.data-table tr:last-child td { border-bottom: none; }
+.data-table tr:hover td      { background: var(--surface-hover); }
+
+/* ── BENTO GRID (hairline gap trick) ─────────────────────── */
+.bento {
+  display:          grid;
+  gap:              1px;
+  background-color: var(--border);
+}
+.bento > * { background: var(--surface); }
+
+/* ── MODAL OVERLAY ───────────────────────────────────────── */
+.modal-backdrop {
+  position:        fixed;
+  inset:           0;
+  background:      rgba(0,0,0,0.75);
+  backdrop-filter: var(--glass-blur-soft);
+  z-index:         var(--layer-overlay);
+  display:         flex;
+  align-items:     center;
+  justify-content: center;
+  padding:         1rem;
+}
+.modal {
+  background:    var(--surface);
+  border:        1px solid var(--border);
+  border-radius: var(--radius-xl);
+  padding:       1.75rem;
+  max-height:    90dvh;
+  overflow-y:    auto;
+  position:      relative;
+  box-shadow:    0 20px 60px rgba(0,0,0,0.6);
+  animation:     fadeIn var(--duration-slow) var(--ease-decel);
+}
+
+/* ── SIDEBAR ─────────────────────────────────────────────── */
+.sidebar {
+  background: var(--surface-panel);
+  border-right: 1px solid var(--border);
+  width: 216px;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  position: sticky;
+  top: 0;
+}
+
+.nav-item {
+  display:         flex;
+  align-items:     center;
+  gap:             9px;
+  padding:         8px 12px;
+  border-radius:   var(--radius-sm);
+  margin-bottom:   2px;
   text-decoration: none;
+  font-size:       13.5px;
+  transition:      background var(--duration-fast), color var(--duration-fast);
+  border-left:     2px solid transparent;
+}
+.nav-item:hover { background: var(--accent-08); color: var(--text-2); }
+.nav-item[data-active="true"] {
+  background:  var(--brand-dim);
+  color:       var(--brand);
+  font-weight: 600;
+  border-left: 2px solid var(--brand);
 }
 
-/* ────────────────────────────────────────
-   SCROLLBARS
-─────────────────────────────────────────── */
+/* ──────────────────────────────────────────────────────────── */
+/*  SCROLLBARS                                                  */
+/* ──────────────────────────────────────────────────────────── */
 ::-webkit-scrollbar        { width: 4px; height: 4px; }
 ::-webkit-scrollbar-track  { background: transparent; }
 ::-webkit-scrollbar-thumb  { background: var(--border-2); border-radius: var(--radius-full); }
 ::-webkit-scrollbar-thumb:hover { background: var(--text-4); }
 
-/* ────────────────────────────────────────
-   ANIMATIONS
-─────────────────────────────────────────── */
+/* ──────────────────────────────────────────────────────────── */
+/*  ANIMATIONS                                                  */
+/* ──────────────────────────────────────────────────────────── */
 @keyframes spin    { to { transform: rotate(360deg); } }
-@keyframes fadeIn  { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+@keyframes fadeIn  {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: none; }
+}
 @keyframes pulse   { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+@keyframes ticker  {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
 @keyframes shimmer {
   0%   { background-position: -200% 0; }
   100% { background-position:  200% 0; }
+}
+
+/* Shimmer loading state */
+.shimmer {
+  background: linear-gradient(90deg, var(--surface) 25%, var(--surface-hover) 50%, var(--surface) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite var(--ease-smooth);
 }

@@ -51,9 +51,9 @@ function btn(variant: 'primary' | 'secondary' | 'ghost' | 'danger'): React.CSSPr
     border: '1px solid transparent', fontFamily: 'var(--font)',
     whiteSpace: 'nowrap',
   }
-  if (variant === 'primary')   return { ...base, background: 'var(--brand)',    color: 'var(--bg)',      border: '1px solid var(--brand)' }
-  if (variant === 'secondary') return { ...base, background: 'var(--surface-2)', color: 'var(--text-2)', border: '1px solid var(--border)' }
-  if (variant === 'danger')    return { ...base, background: 'transparent',     color: '#ef4444',        border: '1px solid #ef4444' }
+  if (variant === 'primary')   return { ...base, background: 'var(--brand)',     color: 'var(--bg-dark)',  border: '1px solid var(--brand-dark)' }
+  if (variant === 'secondary') return { ...base, background: 'var(--surface-2)', color: 'var(--text-2)',  border: '1px solid var(--border)' }
+  if (variant === 'danger')    return { ...base, background: 'transparent',      color: 'var(--error)',   border: '1px solid var(--error)' }
   return { ...base, background: 'transparent', color: 'var(--text-3)' }
 }
 
@@ -540,7 +540,7 @@ function TaskModal({ task, subtasks, onClose, onUpdate, onDelete, onAddSubtask, 
 }
 
 const sel: React.CSSProperties = {
-  background: 'var(--surface-2)', border: '1px solid var(--border)',
+  background: 'transparent', border: '1px solid var(--border-input)',
   borderRadius: 'var(--radius-sm)', padding: '6px 10px',
   fontSize: 12, color: 'var(--text)', outline: 'none', cursor: 'pointer',
   fontFamily: 'var(--font)',
@@ -548,7 +548,7 @@ const sel: React.CSSProperties = {
 
 function input(extra?: React.CSSProperties): React.CSSProperties {
   return {
-    background: 'var(--surface-2)', border: '1px solid var(--border)',
+    background: 'transparent', border: '1px solid var(--border-input)',
     borderRadius: 'var(--radius-sm)', padding: '8px 11px',
     fontSize: 13, color: 'var(--text)', fontFamily: 'var(--font)',
     outline: 'none', width: '100%', ...extra,

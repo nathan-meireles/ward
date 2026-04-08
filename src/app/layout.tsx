@@ -1,5 +1,5 @@
 import type { Metadata } from 'next'
-import { Plus_Jakarta_Sans, Bebas_Neue, Calistoga } from 'next/font/google'
+import { Plus_Jakarta_Sans, Bebas_Neue, Calistoga, Roboto_Mono } from 'next/font/google'
 import './globals.css'
 
 const plusJakarta = Plus_Jakarta_Sans({
@@ -24,6 +24,13 @@ const calistoga = Calistoga({
   display: 'swap',
 })
 
+const robotoMono = Roboto_Mono({
+  subsets: ['latin'],
+  weight: ['400', '500'],
+  variable: '--font-mono',
+  display: 'swap',
+})
+
 export const metadata: Metadata = {
   title: 'NOTREGLR — Central de Operações',
   description: 'Plataforma interna NOTREGLR',
@@ -37,7 +44,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`h-full ${plusJakarta.variable} ${bebasNeue.variable} ${calistoga.variable}`}
+      className={`h-full ${plusJakarta.variable} ${bebasNeue.variable} ${calistoga.variable} ${robotoMono.variable}`}
     >
       <body className={`min-h-full ${plusJakarta.className}`}>{children}</body>
     </html>
