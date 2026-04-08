@@ -25,7 +25,7 @@ const calistoga = Calistoga({
 })
 
 export const metadata: Metadata = {
-  title: 'WARD — Central de Operações',
+  title: 'NOTREGLR — Central de Operações',
   description: 'Plataforma interna NOTREGLR',
 }
 

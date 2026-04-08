@@ -52,7 +52,7 @@ export function Sidebar() {
             lineHeight: 1,
           }}
         >
-          WARD
+          NOTREGLR
         </span>
         <div style={{ color: 'var(--text-3)', fontSize: 11, marginTop: 2 }}>
           Central de Operações
@@ -127,7 +127,7 @@ export function Sidebar() {
           fontSize: 11,
         }}
       >
-        ward.notreglr.com
+        ward.notreglr.com · interno
       </div>
     </aside>
   )
