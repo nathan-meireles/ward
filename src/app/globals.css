@@ -1,26 +1,66 @@
-@import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&family=Bebas+Neue&family=Calistoga&display=swap');
+
+@import 'tailwindcss';
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --brand: #e47c24;
+  --brand-dark: #884710;
+  --brand-dim: rgba(228, 124, 36, 0.1);
+  --brand-dim2: rgba(228, 124, 36, 0.06);
+
+  --bg: #faf8f5;
+  --surface: #ffffff;
+  --surface-2: #f7f3ee;
+  --surface-3: #ede8e0;
+
+  --border: #e0d8cc;
+  --border-2: #cfc5b4;
+
+  --text: #1a1410;
+  --text-2: #4a3f35;
+  --text-3: #8a7a6a;
+  --text-4: #b8aba0;
+
+  --font: 'Plus Jakarta Sans', system-ui, sans-serif;
+  --font-display: 'Bebas Neue', sans-serif;
+  --font-alt: 'Calistoga', serif;
+
+  --radius: 10px;
+  --radius-sm: 6px;
+  --radius-lg: 16px;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+html.dark {
+  --bg: #1c1c1e;
+  --surface: #2c2c2e;
+  --surface-2: #363638;
+  --surface-3: #424244;
+
+  --border: rgba(255, 255, 255, 0.13);
+  --border-2: rgba(255, 255, 255, 0.2);
+
+  --text: #f2f2f2;
+  --text-2: #c8c0b8;
+  --text-3: #8a8080;
+  --text-4: #5a5450;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
 }
+
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border-2); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-4); }
