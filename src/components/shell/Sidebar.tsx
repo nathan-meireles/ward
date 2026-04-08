@@ -2,7 +2,8 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Bookmark, Package, Megaphone, CheckSquare, BarChart2 } from 'lucide-react'
+import { Bookmark, Package, Megaphone, CheckSquare, BarChart2, Sun, Moon } from 'lucide-react'
+import { useEffect, useState } from 'react'
 
 const NAV = [
   { href: '/swipe',     icon: Bookmark,    label: 'Swipe File'  },
@@ -14,10 +15,26 @@ const NAV = [
 
 export function Sidebar() {
   const pathname = usePathname()
+  const [light, setLight] = useState(false)
+
+  useEffect(() => {
+    const saved = localStorage.getItem('theme')
+    if (saved === 'light') {
+      document.documentElement.classList.add('light')
+      setLight(true)
+    }
+  }, [])
+
+  function toggleTheme() {
+    const next = !light
+    setLight(next)
+    document.documentElement.classList.toggle('light', next)
+    localStorage.setItem('theme', next ? 'light' : 'dark')
+  }
 
   return (
     <aside style={{
-      background: 'var(--surface)',
+      background: 'var(--surface-panel)',
       borderRight: '1px solid var(--border)',
       width: 216,
       minHeight: '100dvh',
@@ -28,7 +45,7 @@ export function Sidebar() {
       top: 0,
     }}>
       {/* Logo */}
-      <div style={{ padding: '22px 20px 20px' }}>
+      <div style={{ padding: '22px 20px 18px' }}>
         <div style={{
           fontFamily: 'var(--font-display)',
           fontSize: 22,
@@ -44,8 +61,11 @@ export function Sidebar() {
         </div>
       </div>
 
+      {/* Divider */}
+      <div style={{ height: 1, background: 'var(--border)', margin: '0 14px' }} />
+
       {/* Nav */}
-      <nav style={{ padding: '4px 10px', flex: 1 }}>
+      <nav style={{ padding: '8px 8px', flex: 1 }}>
         {NAV.map(({ href, icon: Icon, label }) => {
           const active = pathname.startsWith(href)
           return (
@@ -53,15 +73,16 @@ export function Sidebar() {
               display: 'flex',
               alignItems: 'center',
               gap: 9,
-              padding: '8px 10px',
+              padding: '8px 12px',
               borderRadius: 'var(--radius-sm)',
-              marginBottom: 1,
+              marginBottom: 2,
               textDecoration: 'none',
-              color: active ? 'var(--text)' : 'var(--text-3)',
-              background: active ? 'var(--surface-2)' : 'transparent',
+              color: active ? 'var(--brand)' : 'var(--text-3)',
+              background: active ? 'var(--brand-dim)' : 'transparent',
               fontWeight: active ? 600 : 400,
               fontSize: 13.5,
-              transition: 'background 0.1s, color 0.1s',
+              transition: 'background 0.15s, color 0.15s',
+              borderLeft: active ? `2px solid var(--brand)` : '2px solid transparent',
             }}>
               <Icon size={15} strokeWidth={active ? 2.2 : 1.8} />
               {label}
@@ -72,12 +93,32 @@ export function Sidebar() {
 
       {/* Footer */}
       <div style={{
-        padding: '14px 20px',
+        padding: '12px 14px',
         borderTop: '1px solid var(--border)',
-        color: 'var(--text-4)',
-        fontSize: 11,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
       }}>
-        ward.notreglr.com
+        <span style={{ color: 'var(--text-4)', fontSize: 11 }}>ward.notreglr.com</span>
+        <button
+          onClick={toggleTheme}
+          title={light ? 'Tema escuro' : 'Tema claro'}
+          style={{
+            background: 'none',
+            border: '1px solid var(--border)',
+            borderRadius: 'var(--radius-sm)',
+            cursor: 'pointer',
+            color: 'var(--text-3)',
+            width: 28,
+            height: 28,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            transition: 'border-color 0.15s, color 0.15s',
+          }}
+        >
+          {light ? <Moon size={13} /> : <Sun size={13} />}
+        </button>
       </div>
     </aside>
   )
