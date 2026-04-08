@@ -339,9 +339,9 @@ export function SwipeClient() {
               onChange={(e) => setTagInput(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); addTag() } }}
               placeholder="hook, copy-forte, concorrente..."
-              style={inputStyle({ flex: '1' })}
+              style={inputStyle({ flex: '1', marginBottom: 0 })}
             />
-            <button onClick={addTag} style={btnStyle('secondary')}>+</button>
+            <button onClick={addTag} style={{ ...btnStyle('secondary'), padding: '8px 12px', flexShrink: 0 }}>+</button>
           </div>
           {tags.length > 0 && (
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>

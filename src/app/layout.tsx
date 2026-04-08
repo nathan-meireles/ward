@@ -39,7 +39,7 @@ export default function RootLayout({
       lang="en"
       className={`h-full ${plusJakarta.variable} ${bebasNeue.variable} ${calistoga.variable}`}
     >
-      <body className="min-h-full">{children}</body>
+      <body className={`min-h-full ${plusJakarta.className}`}>{children}</body>
     </html>
   )
 }
