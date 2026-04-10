@@ -104,7 +104,9 @@ async function fetchAliExpress(productId: string): Promise<string> {
 
 // ─── DOWNLOAD DE IMAGEM → BASE64 ───────────────────────────────────────────
 
-async function imageToBase64(url: string): Promise<{ data: string; mediaType: string } | null> {
+type ImageMediaType = 'image/jpeg' | 'image/png' | 'image/webp' | 'image/gif'
+
+async function imageToBase64(url: string): Promise<{ data: string; mediaType: ImageMediaType } | null> {
   try {
     const res = await fetch(url, {
       headers: { 'Referer': 'https://www.aliexpress.com/' },
@@ -114,7 +116,7 @@ async function imageToBase64(url: string): Promise<{ data: string; mediaType: st
     const buffer = await res.arrayBuffer()
     const base64 = Buffer.from(buffer).toString('base64')
     const contentType = res.headers.get('content-type') ?? 'image/jpeg'
-    const mediaType = contentType.split(';')[0].trim() as 'image/jpeg' | 'image/png' | 'image/webp' | 'image/gif'
+    const mediaType = (contentType.split(';')[0].trim() || 'image/jpeg') as ImageMediaType
     return { data: base64, mediaType }
   } catch {
     return null
