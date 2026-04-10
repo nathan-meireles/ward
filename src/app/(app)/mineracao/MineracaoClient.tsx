@@ -227,6 +227,7 @@ export function MineracaoClient() {
   }, [products, load])
 
   const [analyzeProgress, setAnalyzeProgress] = useState<{ current: number; total: number } | null>(null)
+  const [analyzeError, setAnalyzeError] = useState<string | null>(null)
 
   async function handleAnalyze() {
     const urls = input.split('\n').map(u => u.trim()).filter(Boolean)
@@ -234,16 +235,26 @@ export function MineracaoClient() {
     setAnalyzing(true)
     setShowInput(false)
     setInput('')
+    setAnalyzeError(null)
 
     try {
-      // Processa 1 URL por vez para evitar timeout do Vercel
       for (let i = 0; i < urls.length; i++) {
         setAnalyzeProgress({ current: i + 1, total: urls.length })
-        await fetch('/api/mineracao/analyze', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ urls: [urls[i]] }),
-        })
+        try {
+          const res = await fetch('/api/mineracao/analyze', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ urls: [urls[i]] }),
+          })
+          if (!res.ok) {
+            const text = await res.text()
+            console.error(`Erro URL ${i + 1}:`, res.status, text)
+            setAnalyzeError(`Erro ${res.status}: ${text.slice(0, 200)}`)
+          }
+        } catch (e) {
+          console.error(`Falha URL ${i + 1}:`, e)
+          setAnalyzeError(e instanceof Error ? e.message : 'Erro de rede')
+        }
         await load()
       }
     } finally {
@@ -335,6 +346,17 @@ export function MineracaoClient() {
               transition: 'width 0.4s ease',
             }} />
           </div>
+        </div>
+      )}
+
+      {/* Error */}
+      {analyzeError && (
+        <div style={{
+          marginBottom: 16, padding: '10px 14px',
+          background: 'rgba(248,113,113,0.1)', border: '1px solid #f87171',
+          borderRadius: 'var(--radius-sm)', fontSize: 12, color: '#f87171',
+        }}>
+          {analyzeError}
         </div>
       )}
 
