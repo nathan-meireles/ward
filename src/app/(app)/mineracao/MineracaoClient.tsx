@@ -35,8 +35,13 @@ function clientExtractImages(html: string): string[] {
 }
 
 function clientExtractPrice(html: string): { min: number | null; max: number | null } {
+  // Padrão desktop JSON
   const r = html.match(/"minPrice"\s*:\s*"?([0-9.]+)"?[^}]{0,200}"maxPrice"\s*:\s*"?([0-9.]+)"?/)
   if (r) return { min: parseFloat(r[1]), max: parseFloat(r[2]) }
+  // Padrão mobile: "salePrice":"US $12.34" ou "originalPrice"
+  const sale = html.match(/"salePrice"\s*:\s*"[^0-9]*([0-9]+[.,][0-9]+)"/)
+  if (sale) { const v = parseFloat(sale[1].replace(',', '.')); return { min: v, max: v } }
+  // Padrão com formatedActivityPrice
   const a = html.match(/"formatedActivityPrice"\s*:\s*"([^"]+)"/)
   if (a) {
     const nums = a[1].match(/[0-9]+[.,][0-9]+/g)
@@ -45,20 +50,34 @@ function clientExtractPrice(html: string): { min: number | null; max: number | n
       return { min: Math.min(...prices), max: Math.max(...prices) }
     }
   }
+  // Padrão genérico: qualquer "price" com valor numérico
+  const generic = html.match(/"price"\s*:\s*"[^0-9]*([0-9]+[.,][0-9]+)"/)
+  if (generic) { const v = parseFloat(generic[1].replace(',', '.')); return { min: v, max: v } }
   return { min: null, max: null }
 }
 
 function clientExtractOrders(html: string): string | null {
-  const m = html.match(/"formatTradeCount"\s*:\s*"([^"]+)"/)
-  if (m) return m[1]
-  const m2 = html.match(/"tradeCount"\s*:\s*"?(\d+)"?/)
-  return m2 ? m2[1] : null
+  const patterns = [
+    /"formatTradeCount"\s*:\s*"([^"]+)"/,
+    /"tradeCount"\s*:\s*"?(\d+)"?/,
+    /"soldCount"\s*:\s*"?(\d+)"?/,
+    /"totalOrders"\s*:\s*"?(\d+)"?/,
+    /(\d[\d,]+)\s*(?:sold|orders|vendidos)/i,
+  ]
+  for (const p of patterns) {
+    const m = html.match(p)
+    if (m) return m[1]
+  }
+  return null
 }
 
 function clientExtractRating(html: string) {
-  const r = html.match(/"averageStar"\s*:\s*"?([0-9.]+)"?/)
-  const c = html.match(/"totalValidNum"\s*:\s*"?(\d+)"?/)
-  return { rating: r ? parseFloat(r[1]) : null, reviewCount: c ? parseInt(c[1]) : null }
+  const rPatterns = [/"averageStar"\s*:\s*"?([0-9.]+)"?/, /"rating"\s*:\s*"?([0-9.]+)"?/, /"starRating"\s*:\s*"?([0-9.]+)"?/]
+  const cPatterns = [/"totalValidNum"\s*:\s*"?(\d+)"?/, /"reviewCount"\s*:\s*"?(\d+)"?/, /"evaluateCount"\s*:\s*"?(\d+)"?/]
+  let rating = null, reviewCount = null
+  for (const p of rPatterns) { const m = html.match(p); if (m) { rating = parseFloat(m[1]); break } }
+  for (const p of cPatterns) { const m = html.match(p); if (m) { reviewCount = parseInt(m[1]); break } }
+  return { rating, reviewCount }
 }
 
 interface Product {
