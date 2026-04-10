@@ -315,6 +315,29 @@ export function MineracaoClient() {
         </div>
       </div>
 
+      {/* Progress bar */}
+      {analyzing && analyzeProgress && (
+        <div style={{ marginBottom: 20 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+            <span style={{ fontSize: 12, color: 'var(--text-3)' }}>
+              Analisando produto {analyzeProgress.current} de {analyzeProgress.total}...
+            </span>
+            <span style={{ fontSize: 12, color: 'var(--text-4)' }}>
+              {Math.round((analyzeProgress.current / analyzeProgress.total) * 100)}%
+            </span>
+          </div>
+          <div style={{ height: 4, background: 'var(--surface-2)', borderRadius: 99, overflow: 'hidden' }}>
+            <div style={{
+              height: '100%',
+              width: `${(analyzeProgress.current / analyzeProgress.total) * 100}%`,
+              background: 'var(--brand)',
+              borderRadius: 99,
+              transition: 'width 0.4s ease',
+            }} />
+          </div>
+        </div>
+      )}
+
       {/* Stats */}
       {products.length > 0 && (
         <div style={{ display: 'flex', gap: 10, marginBottom: 20, flexWrap: 'wrap' }}>
