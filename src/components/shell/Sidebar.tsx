@@ -68,10 +68,10 @@ export function Sidebar() {
       {/* Logo */}
       <div style={{ padding: '22px 20px 18px' }}>
         <div style={{
-          fontFamily: 'var(--font-alt)',
-          fontSize: 20,
-          letterSpacing: 1,
-          color: 'var(--text)',
+          fontFamily: 'var(--font-display)',
+          fontSize: 22,
+          letterSpacing: 2,
+          color: 'var(--brand)',
           lineHeight: 1,
           marginBottom: 3,
         }}>

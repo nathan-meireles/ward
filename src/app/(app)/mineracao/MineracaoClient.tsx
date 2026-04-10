@@ -728,7 +728,7 @@ function BulkActionBar({ count, onDelete, onExport, onRefetch, onClear }: {
       </span>
       <div style={{ width: 1, height: 16, background: 'var(--border-2)' }} />
       <button onClick={onRefetch} className="btn btn-ghost" style={{ minHeight: 28, padding: '4px 10px' }}>
-        <RefreshCw size={12} /> Re-fetch
+        <RefreshCw size={12} /> Atualizar dados
       </button>
       <button onClick={onExport} className="btn btn-ghost" style={{ minHeight: 28, padding: '4px 10px' }}>
         <Download size={12} /> Exportar
@@ -1109,8 +1109,8 @@ export function MineracaoClient() {
             </button>
           )}
           {products.length > 0 && (
-            <button onClick={() => handleRefetch(products)} disabled={analyzing} className="btn btn-ghost" title="Re-fetch todos os produtos do AliExpress">
-              <RefreshCw size={14} /> Re-fetch todos
+            <button onClick={() => handleRefetch(products)} disabled={analyzing} className="btn btn-ghost" title="Buscar dados atualizados no AliExpress para todos os produtos">
+              <RefreshCw size={14} /> Atualizar todos
             </button>
           )}
           {products.length > 0 && (
