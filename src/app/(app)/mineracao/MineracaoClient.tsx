@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
-import { Search, Trash2, ExternalLink, Loader2, Plus, RefreshCw, ImagePlus } from 'lucide-react'
+import { Trash2, ExternalLink, Loader2, Plus, RefreshCw, ImagePlus, X, ChevronDown } from 'lucide-react'
 
 interface Product {
   id: string
@@ -32,234 +32,347 @@ function scoreColor(score: number | null) {
 }
 
 function labelBg(label: string | null) {
-  if (label === 'forte') return 'rgba(74,222,128,0.15)'
-  if (label === 'medio') return 'rgba(251,191,36,0.15)'
-  return 'rgba(248,113,113,0.15)'
+  if (label === 'forte') return 'rgba(74,222,128,0.18)'
+  if (label === 'medio') return 'rgba(251,191,36,0.18)'
+  if (label === 'fraco') return 'rgba(248,113,113,0.18)'
+  return 'rgba(255,255,255,0.06)'
 }
 
-function StatusBadge({ status }: { status: string }) {
-  const map: Record<string, { label: string; color: string }> = {
-    pending:   { label: 'Pendente',   color: 'var(--text-4)' },
-    analyzing: { label: 'Analisando', color: '#60a5fa' },
-    done:      { label: 'Concluído',  color: '#4ade80' },
-    partial:   { label: 'Parcial',    color: '#fbbf24' },
-    error:     { label: 'Erro',       color: '#f87171' },
+function formatDate(iso: string) {
+  const d = new Date(iso)
+  return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' })
+}
+
+function StatusDot({ status }: { status: string }) {
+  const colors: Record<string, string> = {
+    pending: 'var(--text-4)', analyzing: '#60a5fa', done: '#4ade80',
+    partial: '#fbbf24', error: '#f87171',
   }
-  const s = map[status] ?? map.pending
+  const labels: Record<string, string> = {
+    pending: 'Pendente', analyzing: 'Analisando', done: 'Concluído',
+    partial: 'Parcial', error: 'Erro',
+  }
+  const color = colors[status] ?? colors.pending
   return (
-    <span style={{
-      fontSize: 10,
-      color: s.color,
-      border: `1px solid ${s.color}`,
-      borderRadius: 'var(--radius-sm)',
-      padding: '1px 6px',
-      letterSpacing: 0.5,
-      textTransform: 'uppercase',
-    }}>
-      {s.label}
+    <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, color, textTransform: 'uppercase', letterSpacing: 0.4 }}>
+      <span style={{ width: 5, height: 5, borderRadius: '50%', background: color, flexShrink: 0 }} />
+      {labels[status] ?? status}
     </span>
   )
 }
 
-function ProductCard({ product, onDelete, onReanalyze }: {
-  product: Product
-  onDelete: (id: string) => void
-  onReanalyze: (id: string) => void
-}) {
-  const [imgError, setImgError] = useState(false)
-  const [imgInput, setImgInput] = useState('')
-  const [showImgInput, setShowImgInput] = useState(false)
-  const [submitting, setSubmitting] = useState(false)
-  const mainImg = product.images?.[0]
-  const isAnalyzing = product.status === 'analyzing'
+// ─── DETAIL PANEL ─────────────────────────────────────────────────────────────
 
-  async function handleImageSubmit() {
+function DetailPanel({ product, onClose, onDelete, onImageSubmit }: {
+  product: Product
+  onClose: () => void
+  onDelete: (id: string) => void
+  onImageSubmit: (id: string, url: string) => Promise<void>
+}) {
+  const [imgInput, setImgInput] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const [imgErr, setImgErr] = useState(false)
+
+  async function handleImg() {
     if (!imgInput.trim()) return
     setSubmitting(true)
-    await fetch('/api/mineracao/analyze-image', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: product.id, imageUrl: imgInput.trim() }),
-    })
-    setShowImgInput(false)
+    await onImageSubmit(product.id, imgInput.trim())
     setImgInput('')
     setSubmitting(false)
-    onReanalyze(product.id)
   }
 
   return (
     <div style={{
-      background: 'var(--surface)',
-      border: '1px solid var(--border)',
-      borderRadius: 'var(--radius)',
-      overflow: 'hidden',
-      display: 'flex',
-      flexDirection: 'column',
-      transition: 'border-color 0.15s',
-      position: 'relative',
+      position: 'fixed', inset: 0, zIndex: 50,
+      display: 'flex', justifyContent: 'flex-end',
     }}>
-      {/* Imagem */}
+      {/* backdrop */}
+      <div
+        onClick={onClose}
+        style={{ position: 'absolute', inset: 0, background: 'rgba(9,9,10,0.6)' }}
+      />
+      {/* panel */}
+      <div style={{
+        position: 'relative', zIndex: 1,
+        width: 420, maxWidth: '100vw',
+        background: 'var(--surface)',
+        borderLeft: '1px solid var(--border)',
+        display: 'flex', flexDirection: 'column',
+        overflowY: 'auto',
+      }}>
+        {/* Header */}
+        <div style={{
+          padding: '16px 20px', borderBottom: '1px solid var(--border)',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          position: 'sticky', top: 0, background: 'var(--surface)', zIndex: 2,
+        }}>
+          <StatusDot status={product.status} />
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-4)', padding: 4 }}>
+            <X size={16} />
+          </button>
+        </div>
+
+        {/* Image */}
+        <div style={{ background: 'var(--surface-2)', aspectRatio: '1', position: 'relative' }}>
+          {product.images?.[0] && !imgErr ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={product.images[0]}
+              alt={product.title ?? ''}
+              onError={() => setImgErr(true)}
+              style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+            />
+          ) : (
+            <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
+              <span style={{ color: 'var(--text-4)', fontSize: 12 }}>Sem imagem</span>
+              <div style={{ display: 'flex', gap: 6, width: '80%' }}>
+                <input
+                  value={imgInput}
+                  onChange={e => setImgInput(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && handleImg()}
+                  placeholder="Cole URL da imagem do AliExpress"
+                  style={{
+                    flex: 1, fontSize: 11, padding: '6px 10px',
+                    background: 'var(--surface-3)', border: '1px solid var(--border-input)',
+                    borderRadius: 'var(--radius-sm)', color: 'var(--text)', outline: 'none',
+                  }}
+                />
+                <button
+                  onClick={handleImg}
+                  disabled={submitting || !imgInput.trim()}
+                  style={{
+                    background: 'var(--brand)', color: 'var(--bg)', border: 'none',
+                    borderRadius: 'var(--radius-sm)', cursor: 'pointer', padding: '6px 10px',
+                    fontWeight: 600, fontSize: 11,
+                    opacity: submitting || !imgInput.trim() ? 0.5 : 1,
+                  }}
+                >
+                  {submitting ? <Loader2 size={10} style={{ animation: 'spin 1s linear infinite' }} /> : 'OK'}
+                </button>
+              </div>
+            </div>
+          )}
+          {/* Score overlay */}
+          {product.notreglr_score !== null && (
+            <div style={{
+              position: 'absolute', top: 12, right: 12,
+              background: labelBg(product.notreglr_label),
+              border: `1px solid ${scoreColor(product.notreglr_score)}`,
+              borderRadius: 'var(--radius-sm)',
+              padding: '4px 10px',
+              display: 'flex', alignItems: 'center', gap: 6,
+            }}>
+              <span style={{ fontWeight: 800, fontSize: 22, color: scoreColor(product.notreglr_score), lineHeight: 1 }}>
+                {product.notreglr_score}
+              </span>
+              <span style={{ fontSize: 10, color: scoreColor(product.notreglr_score), textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                {product.notreglr_label}
+              </span>
+            </div>
+          )}
+        </div>
+
+        {/* Content */}
+        <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {/* Title */}
+          <h3 style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', margin: 0, lineHeight: 1.4 }}>
+            {product.title ?? `Produto ${product.aliexpress_id}`}
+          </h3>
+
+          {/* Stats */}
+          <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+            {(product.price_min || product.price_max) && (
+              <div>
+                <div style={{ fontSize: 10, color: 'var(--text-4)', marginBottom: 2 }}>PREÇO</div>
+                <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--brand)' }}>
+                  €{product.price_min?.toFixed(2)}{product.price_max && product.price_max !== product.price_min ? `–${product.price_max.toFixed(2)}` : ''}
+                </div>
+              </div>
+            )}
+            {product.orders_count && (
+              <div>
+                <div style={{ fontSize: 10, color: 'var(--text-4)', marginBottom: 2 }}>PEDIDOS</div>
+                <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-2)' }}>{product.orders_count}</div>
+              </div>
+            )}
+            {product.rating && (
+              <div>
+                <div style={{ fontSize: 10, color: 'var(--text-4)', marginBottom: 2 }}>RATING</div>
+                <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-2)' }}>★ {product.rating.toFixed(1)}</div>
+              </div>
+            )}
+            <div>
+              <div style={{ fontSize: 10, color: 'var(--text-4)', marginBottom: 2 }}>ADICIONADO</div>
+              <div style={{ fontSize: 13, color: 'var(--text-3)' }}>{formatDate(product.created_at)}</div>
+            </div>
+          </div>
+
+          {/* Reasoning */}
+          {product.notreglr_reasoning && (
+            <div style={{ background: 'var(--surface-2)', borderRadius: 'var(--radius-sm)', padding: '12px 14px' }}>
+              <div style={{ fontSize: 10, color: 'var(--text-4)', marginBottom: 6, letterSpacing: 0.5 }}>ANÁLISE CLAUDE</div>
+              <p style={{ fontSize: 12, color: 'var(--text-2)', lineHeight: 1.6, margin: 0 }}>
+                {product.notreglr_reasoning}
+              </p>
+            </div>
+          )}
+
+          {/* Error */}
+          {product.error_msg && (
+            <p style={{ fontSize: 11, color: '#f87171', margin: 0, background: 'rgba(248,113,113,0.08)', padding: '8px 10px', borderRadius: 'var(--radius-sm)' }}>
+              {product.error_msg}
+            </p>
+          )}
+
+          {/* Actions */}
+          <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+            <a
+              href={product.aliexpress_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                fontSize: 12, color: 'var(--text-3)', textDecoration: 'none',
+                padding: '8px 14px', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)',
+              }}
+            >
+              <ExternalLink size={12} /> Ver no AliExpress
+            </a>
+            <button
+              onClick={() => { onDelete(product.id); onClose() }}
+              style={{
+                background: 'rgba(248,113,113,0.1)', border: '1px solid rgba(248,113,113,0.3)',
+                borderRadius: 'var(--radius-sm)', cursor: 'pointer',
+                color: '#f87171', padding: '8px 14px',
+                display: 'flex', alignItems: 'center', gap: 6, fontSize: 12,
+              }}
+            >
+              <Trash2 size={12} /> Remover
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── PRODUCT CARD ──────────────────────────────────────────────────────────────
+
+function ProductCard({ product, onClick }: { product: Product; onClick: () => void }) {
+  const [imgErr, setImgErr] = useState(false)
+  const mainImg = product.images?.[0]
+  const isAnalyzing = product.status === 'analyzing'
+
+  return (
+    <div
+      onClick={onClick}
+      style={{
+        background: 'var(--surface)',
+        border: `1px solid ${product.notreglr_score !== null ? scoreColor(product.notreglr_score) + '40' : 'var(--border)'}`,
+        borderRadius: 'var(--radius)',
+        overflow: 'hidden',
+        display: 'flex',
+        flexDirection: 'column',
+        cursor: 'pointer',
+        transition: 'border-color 0.15s, transform 0.1s',
+      }}
+      onMouseEnter={e => (e.currentTarget.style.transform = 'translateY(-2px)')}
+      onMouseLeave={e => (e.currentTarget.style.transform = 'translateY(0)')}
+    >
+      {/* Image */}
       <div style={{ position: 'relative', aspectRatio: '1', background: 'var(--surface-2)' }}>
         {isAnalyzing && (
           <div style={{
             position: 'absolute', inset: 0, zIndex: 10,
-            background: 'rgba(9,9,10,0.6)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: 'rgba(9,9,10,0.55)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 8,
           }}>
-            <Loader2 size={24} style={{ color: 'var(--brand)', animation: 'spin 1s linear infinite' }} />
+            <Loader2 size={20} style={{ color: 'var(--brand)', animation: 'spin 1s linear infinite' }} />
+            <span style={{ fontSize: 10, color: 'var(--text-4)' }}>Analisando...</span>
           </div>
         )}
-
-        {mainImg && !imgError ? (
+        {mainImg && !imgErr ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={mainImg}
             alt={product.title ?? ''}
-            onError={() => setImgError(true)}
+            onError={() => setImgErr(true)}
             style={{ width: '100%', height: '100%', objectFit: 'cover' }}
           />
         ) : (
-          <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <span style={{ color: 'var(--text-4)', fontSize: 11 }}>Sem imagem</span>
+          <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 6 }}>
+            {!isAnalyzing && (
+              <>
+                <ImagePlus size={18} style={{ color: 'var(--text-4)' }} />
+                <span style={{ color: 'var(--text-4)', fontSize: 10 }}>Sem imagem</span>
+              </>
+            )}
           </div>
         )}
 
-        {/* Score badge */}
+        {/* Score */}
         {product.notreglr_score !== null && (
           <div style={{
             position: 'absolute', top: 8, right: 8,
             background: labelBg(product.notreglr_label),
             border: `1px solid ${scoreColor(product.notreglr_score)}`,
             borderRadius: 'var(--radius-sm)',
-            padding: '3px 8px',
-            display: 'flex', alignItems: 'center', gap: 4,
+            padding: '2px 8px',
+            display: 'flex', alignItems: 'baseline', gap: 4,
           }}>
-            <span style={{ fontWeight: 700, fontSize: 16, color: scoreColor(product.notreglr_score) }}>
+            <span style={{ fontWeight: 800, fontSize: 18, color: scoreColor(product.notreglr_score), lineHeight: 1.2 }}>
               {product.notreglr_score}
             </span>
-            <span style={{ fontSize: 9, color: scoreColor(product.notreglr_score), textTransform: 'uppercase', letterSpacing: 0.5 }}>
-              {product.notreglr_label}
-            </span>
+          </div>
+        )}
+
+        {/* Status dot (só se não tiver score) */}
+        {product.notreglr_score === null && (
+          <div style={{ position: 'absolute', top: 8, right: 8 }}>
+            <StatusDot status={product.status} />
           </div>
         )}
       </div>
 
       {/* Info */}
-      <div style={{ padding: '12px 14px', flex: 1, display: 'flex', flexDirection: 'column', gap: 8 }}>
-        {/* Title + status */}
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
-          <p style={{
-            fontSize: 12, color: 'var(--text-2)', lineHeight: 1.4,
-            overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
-            margin: 0, flex: 1,
-          }}>
-            {product.title ?? product.aliexpress_id ?? '—'}
-          </p>
-          <StatusBadge status={product.status} />
-        </div>
+      <div style={{ padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 6, flex: 1 }}>
+        <p style={{
+          fontSize: 11.5, color: 'var(--text-2)', lineHeight: 1.4,
+          overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
+          margin: 0,
+        }}>
+          {product.title ?? product.aliexpress_id ?? '—'}
+        </p>
 
-        {/* Meta */}
-        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+        {/* Meta row */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginTop: 'auto' }}>
           {(product.price_min || product.price_max) && (
-            <span style={{ fontSize: 11, color: 'var(--brand)' }}>
-              €{product.price_min?.toFixed(2) ?? '?'}{product.price_max && product.price_max !== product.price_min ? `–${product.price_max?.toFixed(2)}` : ''}
+            <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--brand)' }}>
+              €{product.price_min?.toFixed(2)}{product.price_max && product.price_max !== product.price_min ? `–${product.price_max.toFixed(2)}` : ''}
             </span>
           )}
           {product.orders_count && (
-            <span style={{ fontSize: 11, color: 'var(--text-4)' }}>{product.orders_count} pedidos</span>
+            <span style={{ fontSize: 10, color: 'var(--text-4)' }}>{product.orders_count} ped.</span>
           )}
           {product.rating && (
-            <span style={{ fontSize: 11, color: 'var(--text-4)' }}>★ {product.rating.toFixed(1)}</span>
+            <span style={{ fontSize: 10, color: 'var(--text-4)' }}>★{product.rating.toFixed(1)}</span>
           )}
+          <span style={{ fontSize: 10, color: 'var(--text-4)', marginLeft: 'auto' }}>{formatDate(product.created_at)}</span>
         </div>
 
-        {/* Reasoning */}
-        {product.notreglr_reasoning && (
-          <p style={{
-            fontSize: 11, color: 'var(--text-3)', lineHeight: 1.5, margin: 0,
-            borderLeft: `2px solid ${scoreColor(product.notreglr_score)}`,
-            paddingLeft: 8,
+        {/* Label badge */}
+        {product.notreglr_label && (
+          <div style={{
+            alignSelf: 'flex-start',
+            background: labelBg(product.notreglr_label),
+            color: scoreColor(product.notreglr_score),
+            fontSize: 9, fontWeight: 700, letterSpacing: 0.8,
+            textTransform: 'uppercase', padding: '2px 6px',
+            borderRadius: 'var(--radius-sm)',
           }}>
-            {product.notreglr_reasoning}
-          </p>
-        )}
-
-        {product.error_msg && (
-          <p style={{ fontSize: 11, color: '#f87171', margin: 0 }}>{product.error_msg}</p>
-        )}
-
-        {/* Input de imagem manual */}
-        {showImgInput && (
-          <div style={{ display: 'flex', gap: 4 }}>
-            <input
-              autoFocus
-              value={imgInput}
-              onChange={e => setImgInput(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && handleImageSubmit()}
-              placeholder="Cole a URL da imagem"
-              style={{
-                flex: 1, fontSize: 11, padding: '4px 8px',
-                background: 'var(--surface-2)', border: '1px solid var(--border-input)',
-                borderRadius: 'var(--radius-sm)', color: 'var(--text)', outline: 'none',
-              }}
-            />
-            <button
-              onClick={handleImageSubmit}
-              disabled={submitting || !imgInput.trim()}
-              style={{
-                background: 'var(--brand)', color: 'var(--bg)', border: 'none',
-                borderRadius: 'var(--radius-sm)', cursor: 'pointer',
-                padding: '4px 8px', fontSize: 11, fontWeight: 600,
-                opacity: submitting || !imgInput.trim() ? 0.5 : 1,
-              }}
-            >
-              {submitting ? <Loader2 size={10} style={{ animation: 'spin 1s linear infinite' }} /> : 'OK'}
-            </button>
+            {product.notreglr_label}
           </div>
         )}
-
-        {/* Actions */}
-        <div style={{ display: 'flex', gap: 6, marginTop: 'auto', paddingTop: 4 }}>
-          <a
-            href={product.aliexpress_url}
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{
-              display: 'flex', alignItems: 'center', gap: 4,
-              fontSize: 11, color: 'var(--text-4)',
-              textDecoration: 'none', padding: '4px 8px',
-              border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)',
-              flex: 1, justifyContent: 'center',
-            }}
-          >
-            <ExternalLink size={10} /> AliExpress
-          </a>
-          {(product.status === 'error' || !product.notreglr_score) && (
-            <button
-              onClick={() => setShowImgInput(v => !v)}
-              title="Adicionar imagem para analisar"
-              style={{
-                background: 'none', border: '1px solid var(--border)',
-                borderRadius: 'var(--radius-sm)', cursor: 'pointer',
-                color: showImgInput ? 'var(--brand)' : 'var(--text-4)',
-                padding: '4px 8px', display: 'flex', alignItems: 'center',
-              }}
-            >
-              <ImagePlus size={12} />
-            </button>
-          )}
-          <button
-            onClick={() => onDelete(product.id)}
-            style={{
-              background: 'none', border: '1px solid var(--border)',
-              borderRadius: 'var(--radius-sm)', cursor: 'pointer',
-              color: 'var(--text-4)', padding: '4px 8px',
-              display: 'flex', alignItems: 'center',
-            }}
-          >
-            <Trash2 size={12} />
-          </button>
-        </div>
       </div>
     </div>
   )
@@ -267,13 +380,20 @@ function ProductCard({ product, onDelete, onReanalyze }: {
 
 // ─── MAIN ─────────────────────────────────────────────────────────────────────
 
+type SortKey = 'score' | 'date' | 'price' | 'orders'
+type FilterKey = 'all' | 'forte' | 'medio' | 'fraco' | 'error'
+
 export function MineracaoClient() {
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
   const [analyzing, setAnalyzing] = useState(false)
+  const [analyzeProgress, setAnalyzeProgress] = useState<{ current: number; total: number } | null>(null)
+  const [analyzeError, setAnalyzeError] = useState<string | null>(null)
   const [input, setInput] = useState('')
   const [showInput, setShowInput] = useState(false)
-  const [filter, setFilter] = useState<'all' | 'forte' | 'medio' | 'fraco'>('all')
+  const [filter, setFilter] = useState<FilterKey>('all')
+  const [sort, setSort] = useState<SortKey>('score')
+  const [selected, setSelected] = useState<Product | null>(null)
 
   const load = useCallback(async () => {
     const res = await fetch('/api/mineracao')
@@ -283,7 +403,6 @@ export function MineracaoClient() {
 
   useEffect(() => { load() }, [load])
 
-  // Polling enquanto há produtos em análise
   useEffect(() => {
     const hasAnalyzing = products.some(p => p.status === 'analyzing' || p.status === 'pending')
     if (!hasAnalyzing) return
@@ -291,8 +410,12 @@ export function MineracaoClient() {
     return () => clearInterval(timer)
   }, [products, load])
 
-  const [analyzeProgress, setAnalyzeProgress] = useState<{ current: number; total: number } | null>(null)
-  const [analyzeError, setAnalyzeError] = useState<string | null>(null)
+  // Re-sync selected product
+  useEffect(() => {
+    if (!selected) return
+    const updated = products.find(p => p.id === selected.id)
+    if (updated) setSelected(updated)
+  }, [products, selected])
 
   async function handleAnalyze() {
     const urls = input.split('\n').map(u => u.trim()).filter(Boolean)
@@ -313,11 +436,9 @@ export function MineracaoClient() {
           })
           if (!res.ok) {
             const text = await res.text()
-            console.error(`Erro URL ${i + 1}:`, res.status, text)
             setAnalyzeError(`Erro ${res.status}: ${text.slice(0, 200)}`)
           }
         } catch (e) {
-          console.error(`Falha URL ${i + 1}:`, e)
           setAnalyzeError(e instanceof Error ? e.message : 'Erro de rede')
         }
         await load()
@@ -337,28 +458,53 @@ export function MineracaoClient() {
     setProducts(prev => prev.filter(p => p.id !== id))
   }
 
-  const filtered = filter === 'all'
-    ? products
-    : products.filter(p => p.notreglr_label === filter)
+  async function handleImageSubmit(id: string, imageUrl: string) {
+    await fetch('/api/mineracao/analyze-image', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, imageUrl }),
+    })
+    await load()
+  }
+
+  // Filter
+  const filtered = products.filter(p => {
+    if (filter === 'all') return true
+    if (filter === 'error') return p.status === 'error'
+    return p.notreglr_label === filter
+  })
+
+  // Sort
+  const sorted = [...filtered].sort((a, b) => {
+    if (sort === 'score') return (b.notreglr_score ?? -1) - (a.notreglr_score ?? -1)
+    if (sort === 'date') return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    if (sort === 'price') return (a.price_min ?? 999) - (b.price_min ?? 999)
+    if (sort === 'orders') {
+      const aOrders = parseInt(a.orders_count ?? '0')
+      const bOrders = parseInt(b.orders_count ?? '0')
+      return bOrders - aOrders
+    }
+    return 0
+  })
 
   const stats = {
     forte: products.filter(p => p.notreglr_label === 'forte').length,
     medio: products.filter(p => p.notreglr_label === 'medio').length,
     fraco: products.filter(p => p.notreglr_label === 'fraco').length,
-    pending: products.filter(p => !p.notreglr_label && p.status !== 'error').length,
+    error: products.filter(p => p.status === 'error').length,
   }
 
   return (
     <div style={{ maxWidth: 1200 }}>
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 24, gap: 16 }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 20, gap: 16 }}>
         <div>
           <h1 style={{ fontSize: 22, fontWeight: 700, color: 'var(--text)', margin: 0 }}>Mineração</h1>
           <p style={{ color: 'var(--text-4)', fontSize: 12, marginTop: 4 }}>
-            Análise visual de produtos via Claude Vision — {products.length} produto{products.length !== 1 ? 's' : ''}
+            Análise visual via Claude Vision — {products.length} produto{products.length !== 1 ? 's' : ''}
           </p>
         </div>
-        <div style={{ display: 'flex', gap: 8 }}>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <button
             onClick={load}
             style={{
@@ -382,11 +528,10 @@ export function MineracaoClient() {
               opacity: analyzing ? 0.7 : 1,
             }}
           >
-            {analyzing && analyzeProgress ? (
-              <><Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> {analyzeProgress.current}/{analyzeProgress.total}</>
-            ) : (
-              <><Plus size={14} /> Analisar URLs</>
-            )}
+            {analyzing && analyzeProgress
+              ? <><Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> {analyzeProgress.current}/{analyzeProgress.total}</>
+              : <><Plus size={14} /> Analisar URLs</>
+            }
           </button>
         </div>
       </div>
@@ -420,23 +565,28 @@ export function MineracaoClient() {
           marginBottom: 16, padding: '10px 14px',
           background: 'rgba(248,113,113,0.1)', border: '1px solid #f87171',
           borderRadius: 'var(--radius-sm)', fontSize: 12, color: '#f87171',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         }}>
           {analyzeError}
+          <button onClick={() => setAnalyzeError(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#f87171' }}>
+            <X size={12} />
+          </button>
         </div>
       )}
 
-      {/* Stats */}
+      {/* Filters + Sort */}
       {products.length > 0 && (
-        <div style={{ display: 'flex', gap: 10, marginBottom: 20, flexWrap: 'wrap' }}>
-          {[
+        <div style={{ display: 'flex', gap: 8, marginBottom: 20, alignItems: 'center', flexWrap: 'wrap' }}>
+          {([
             { key: 'all', label: 'Todos', count: products.length, color: 'var(--text-3)' },
             { key: 'forte', label: 'Forte', count: stats.forte, color: '#4ade80' },
             { key: 'medio', label: 'Médio', count: stats.medio, color: '#fbbf24' },
             { key: 'fraco', label: 'Fraco', count: stats.fraco, color: '#f87171' },
-          ].map(({ key, label, count, color }) => (
+            { key: 'error', label: 'Erro', count: stats.error, color: 'var(--text-4)' },
+          ] as const).map(({ key, label, count, color }) => (
             <button
               key={key}
-              onClick={() => setFilter(key as typeof filter)}
+              onClick={() => setFilter(key)}
               style={{
                 background: filter === key ? 'var(--surface-2)' : 'none',
                 border: `1px solid ${filter === key ? color : 'var(--border)'}`,
@@ -448,14 +598,31 @@ export function MineracaoClient() {
               }}
             >
               {label}
-              <span style={{
-                background: 'var(--surface-3)', borderRadius: 99,
-                padding: '0 6px', fontSize: 10, color: 'var(--text-4)',
-              }}>
+              <span style={{ background: 'var(--surface-3)', borderRadius: 99, padding: '0 5px', fontSize: 10, color: 'var(--text-4)' }}>
                 {count}
               </span>
             </button>
           ))}
+
+          {/* Sort */}
+          <div style={{ marginLeft: 'auto', position: 'relative', display: 'flex', alignItems: 'center' }}>
+            <select
+              value={sort}
+              onChange={e => setSort(e.target.value as SortKey)}
+              style={{
+                background: 'var(--surface-2)', border: '1px solid var(--border)',
+                borderRadius: 'var(--radius-sm)', color: 'var(--text-3)',
+                fontSize: 12, padding: '5px 28px 5px 10px',
+                cursor: 'pointer', outline: 'none', appearance: 'none',
+              }}
+            >
+              <option value="score">Ordenar: Score</option>
+              <option value="date">Ordenar: Data</option>
+              <option value="price">Ordenar: Preço</option>
+              <option value="orders">Ordenar: Pedidos</option>
+            </select>
+            <ChevronDown size={12} style={{ position: 'absolute', right: 8, color: 'var(--text-4)', pointerEvents: 'none' }} />
+          </div>
         </div>
       )}
 
@@ -473,7 +640,7 @@ export function MineracaoClient() {
             borderRadius: 'var(--radius-lg)',
             padding: 24, width: '100%', maxWidth: 560,
           }}>
-            <h2 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)', margin: '0 0 8px' }}>
+            <h2 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)', margin: '0 0 6px' }}>
               Analisar Produtos
             </h2>
             <p style={{ color: 'var(--text-4)', fontSize: 12, margin: '0 0 16px' }}>
@@ -487,13 +654,10 @@ export function MineracaoClient() {
               autoFocus
               style={{
                 width: '100%', boxSizing: 'border-box',
-                background: 'var(--surface-2)',
-                border: '1px solid var(--border-input)',
-                borderRadius: 'var(--radius-sm)',
-                color: 'var(--text)', fontSize: 12,
+                background: 'var(--surface-2)', border: '1px solid var(--border-input)',
+                borderRadius: 'var(--radius-sm)', color: 'var(--text)', fontSize: 12,
                 padding: '10px 12px', resize: 'vertical',
-                fontFamily: 'var(--font-mono)',
-                outline: 'none',
+                fontFamily: 'var(--font-mono)', outline: 'none',
               }}
             />
             <div style={{ display: 'flex', gap: 8, marginTop: 12, justifyContent: 'flex-end' }}>
@@ -519,8 +683,7 @@ export function MineracaoClient() {
                   display: 'flex', alignItems: 'center', gap: 6,
                 }}
               >
-                {analyzing ? <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <Search size={14} />}
-                Analisar
+                Analisar {input.trim().split('\n').filter(Boolean).length > 0 && `(${input.trim().split('\n').filter(Boolean).length})`}
               </button>
             </div>
           </div>
@@ -532,14 +695,10 @@ export function MineracaoClient() {
         <div style={{ display: 'flex', justifyContent: 'center', padding: 60 }}>
           <Loader2 size={24} style={{ color: 'var(--brand)', animation: 'spin 1s linear infinite' }} />
         </div>
-      ) : filtered.length === 0 ? (
+      ) : sorted.length === 0 ? (
         <div style={{
-          border: '1px dashed var(--border)',
-          borderRadius: 'var(--radius)',
-          padding: 60,
-          textAlign: 'center',
-          color: 'var(--text-4)',
-          fontSize: 13,
+          border: '1px dashed var(--border)', borderRadius: 'var(--radius)',
+          padding: 60, textAlign: 'center', color: 'var(--text-4)', fontSize: 13,
         }}>
           {products.length === 0
             ? 'Nenhum produto ainda. Clique em "Analisar URLs" para começar.'
@@ -548,13 +707,27 @@ export function MineracaoClient() {
       ) : (
         <div style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
-          gap: 16,
+          gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+          gap: 14,
         }}>
-          {filtered.map(p => (
-            <ProductCard key={p.id} product={p} onDelete={handleDelete} onReanalyze={load} />
+          {sorted.map(p => (
+            <ProductCard
+              key={p.id}
+              product={p}
+              onClick={() => setSelected(p)}
+            />
           ))}
         </div>
+      )}
+
+      {/* Detail panel */}
+      {selected && (
+        <DetailPanel
+          product={selected}
+          onClose={() => setSelected(null)}
+          onDelete={handleDelete}
+          onImageSubmit={handleImageSubmit}
+        />
       )}
 
       <style>{`

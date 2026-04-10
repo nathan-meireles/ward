@@ -78,16 +78,33 @@ function extractRating(html: string): { rating: number | null; reviewCount: numb
 // ─── FETCH ALIEXPRESS ──────────────────────────────────────────────────────
 
 async function fetchAliExpress(productId: string): Promise<string> {
-  const urls = [
+  const targetUrl = `https://www.aliexpress.com/item/${productId}.html`
+  const scraperKey = process.env.SCRAPERAPI_KEY
+
+  // Tentativa 1: ScraperAPI (se configurada)
+  if (scraperKey) {
+    try {
+      const proxyUrl = `https://api.scraperapi.com?api_key=${scraperKey}&url=${encodeURIComponent(targetUrl)}&render=false`
+      const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(30000) })
+      const html = await res.text()
+      if (html.length > 5000 && html.includes('aliexpress')) return html
+    } catch {
+      // fallback para fetch direto
+    }
+  }
+
+  // Tentativa 2: fetch direto com headers de browser
+  const directUrls = [
     `https://www.aliexpress.com/item/${productId}.html`,
-    `https://pt.aliexpress.com/item/${productId}.html`,
+    `https://fr.aliexpress.com/item/${productId}.html`,
+    `https://m.aliexpress.com/item/${productId}.html`,
   ]
 
-  for (const url of urls) {
+  for (const url of directUrls) {
     try {
       const res = await fetch(url, {
         headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+          'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
           'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
           'Accept-Language': 'en-US,en;q=0.9',
           'Cache-Control': 'no-cache',
@@ -101,7 +118,7 @@ async function fetchAliExpress(productId: string): Promise<string> {
       // tenta próxima URL
     }
   }
-  throw new Error('Não foi possível acessar o produto')
+  throw new Error('Não foi possível acessar o produto. Configure SCRAPERAPI_KEY no Vercel para análise automática.')
 }
 
 // ─── DOWNLOAD DE IMAGEM → BASE64 ───────────────────────────────────────────
