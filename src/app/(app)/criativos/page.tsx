@@ -2,7 +2,7 @@ export const metadata = { title: 'Criativos — WARD' }
 
 export default function CriativosPage() {
   return (
-    <div style={{ padding: '32px 40px' }}>
+    <div>
       <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-4)', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 8 }}>
         WARD / CRIATIVOS
       </div>

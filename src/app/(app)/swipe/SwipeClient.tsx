@@ -249,6 +249,7 @@ export function SwipeClient() {
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 28 }}>
         <div>
+          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-4)', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 8 }}>WARD / SWIPE FILE</div>
           <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 28, fontWeight: 400, letterSpacing: '0.04em', color: 'var(--text)', margin: 0, lineHeight: 1 }}>Swipe File</h1>
           <p style={{ color: 'var(--text-3)', fontSize: 13, marginTop: 2 }}>
             {items.length} {items.length === 1 ? 'item salvo' : 'itens salvos'}

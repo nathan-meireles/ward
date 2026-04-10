@@ -1071,6 +1071,9 @@ export function MineracaoClient() {
       {/* ── PAGE HEADER ── */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 28, gap: 16 }}>
         <div>
+          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-4)', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 8 }}>
+            WARD / MINERAÇÃO
+          </div>
           <h1 style={{
             fontFamily: 'var(--font-display)',
             fontSize: 28, fontWeight: 400, letterSpacing: '0.04em',

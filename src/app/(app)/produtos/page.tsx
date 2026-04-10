@@ -2,7 +2,7 @@ export const metadata = { title: 'Produtos — WARD' }
 
 export default function ProdutosPage() {
   return (
-    <div style={{ padding: '32px 40px' }}>
+    <div>
       <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-4)', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 8 }}>
         WARD / PRODUTOS
       </div>
