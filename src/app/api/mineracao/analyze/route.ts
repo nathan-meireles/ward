@@ -188,6 +188,7 @@ export async function POST(request: NextRequest) {
       notreglr_score: analysis?.score ?? null,
       notreglr_label: analysis?.label ?? null,
       notreglr_reasoning: analysis?.reasoning ?? null,
+      notreglr_visual_traits: analysis?.visual_traits ?? null,
       status: analysis ? 'done' : 'partial',
       updated_at: new Date().toISOString(),
     }).eq('id', recordId ?? '')
