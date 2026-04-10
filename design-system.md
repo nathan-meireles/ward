@@ -264,29 +264,45 @@ Ring:         rgba(209,255,0,0.4)
 
 ### 2.1 Font Families
 
-| Role | Family | Weight | CSS Variable |
-|------|--------|--------|-------------|
-| Display/Headlines | TASA Orbiter Black | 800–900 | `--font-bb-display` |
-| Body/UI | Geist | 400–700 | `--font-bb-sans` |
-| Technical/Labels | Roboto Mono | 400–500 | `--font-bb-mono` |
+> **AIOX original** → **NOTREGLR adaptation** (loaded via `next/font/google`)
 
-**Loading (Tasa Orbiter Display):**
-```html
-<link rel="preconnect" href="https://fonts.cdnfonts.com" />
-<link href="https://fonts.cdnfonts.com/css/tasa-orbiter-display" rel="stylesheet" />
+| Role | AIOX Family | NOTREGLR Family | CSS Variable | Use |
+|------|-------------|-----------------|-------------|-----|
+| Display/Headlines | TASA Orbiter Black | **Bebas Neue** | `var(--font-display)` | Page h1, logo, impact titles |
+| Body/UI | Geist | **Plus Jakarta Sans** | `var(--font)` | Body text, UI elements, buttons |
+| Technical/Labels | Roboto Mono | **Roboto Mono** | `var(--font-mono)` | HUD labels, nav items, metadata |
+| Decorative | — | **Calistoga** | `var(--font-alt)` | Manifesto quotes, editorial callouts |
+
+### 2.2 Type Scale (NOTREGLR)
+
+| Token | Size (px) | Font | Weight | Letter-spacing | Transform | Use |
+|-------|-----------|------|--------|----------------|-----------|-----|
+| Page H1 | `28` | `var(--font-display)` | 400 | `0.04em` | natural (Bebas = caps) | All page titles |
+| Brandbook H1 | `52` | `var(--font-display)` | 400 | `0.06em` | natural | Marca overview hero |
+| Section Title | `24` | `var(--font-display)` | 400 | `0.04em` | natural | Modal/drawer headers |
+| Body | `13–14` | `var(--font)` | 400–700 | standard | — | Primary text |
+| Small | `11–12` | `var(--font)` | 400–600 | standard | — | Card content, descriptions |
+| Label | `10–11` | `var(--font-mono)` | 500 | `0.10–0.12em` | uppercase | HUD, nav, eyebrow |
+| Micro | `9` | `var(--font-mono)` | 500 | `0.08–0.14em` | uppercase | Metadata, timestamps |
+
+**Standard page header pattern:**
+```tsx
+// Eyebrow (breadcrumb above h1)
+<div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-4)',
+  letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 8 }}>
+  MODULE / PAGE
+</div>
+// Page title
+<h1 style={{ fontFamily: 'var(--font-display)', fontSize: 28, fontWeight: 400,
+  letterSpacing: '0.04em', color: 'var(--text)', margin: 0, lineHeight: 1 }}>
+  Page Title
+</h1>
+// Subtitle / status
+<p style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-4)',
+  textTransform: 'uppercase', letterSpacing: '0.08em', marginTop: 8 }}>
+  Dynamic status text
+</p>
 ```
-
-### 2.2 Type Scale
-
-| Token | Size | Weight | Letter-spacing | Line-height | Transform | Use |
-|-------|------|--------|----------------|-------------|-----------|-----|
-| Display | `clamp(4rem, 10vw, 8rem)` | 800 | `-0.03em` | 1 | uppercase | Impact / hero |
-| H1 | `2.5rem` | 800 | `-0.03em` | 1 | uppercase | Page titles |
-| H2 | `1.5rem` | 800 | standard | 1 | uppercase | Section titles |
-| Body | `1rem` | 400–700 | standard | relaxed | — | Primary text |
-| Small | `0.8rem` | 400–500 | standard | relaxed | — | Descriptions |
-| Label | `0.65rem` | 500 | `0.1em–0.12em` | 1 | uppercase | HUD, nav |
-| Micro | `0.6rem` | 500 | `0.08em` | 1 | uppercase | Footer metadata |
 
 **Responsive Display Scaling:**
 ```css

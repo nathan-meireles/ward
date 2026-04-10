@@ -67,7 +67,7 @@ export function MarcaOverviewClient() {
         <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-4)', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 8 }}>
           BRANDBOOK
         </div>
-        <h1 style={{ fontFamily: 'var(--font-alt)', fontSize: 52, fontWeight: 400, color: 'var(--text)', margin: 0, lineHeight: 1.05 }}>
+        <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 52, fontWeight: 400, letterSpacing: '0.06em', color: 'var(--text)', margin: 0, lineHeight: 1 }}>
           NOTREGLR
         </h1>
         <div style={{ fontFamily: 'var(--font-mono)', fontSize: 14, color: 'var(--brand)', letterSpacing: '0.05em', marginTop: 6 }}>

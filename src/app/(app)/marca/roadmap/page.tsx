@@ -7,7 +7,7 @@ export default function RoadmapPage() {
         <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-4)', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 8 }}>
           MARCA / ROADMAP
         </div>
-        <h1 style={{ fontFamily: 'var(--font-alt)', fontSize: 40, fontWeight: 400, color: 'var(--text)', margin: 0, lineHeight: 1.1 }}>
+        <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 28, fontWeight: 400, letterSpacing: '0.04em', color: 'var(--text)', margin: 0, lineHeight: 1 }}>
           Roadmap de Ativos
         </h1>
         <p style={{ color: 'var(--text-3)', fontSize: 14, marginTop: 8, maxWidth: 560 }}>
@@ -26,7 +26,9 @@ export default function RoadmapPage() {
               fase: 'Agora — Pré-teste',
               items: [
                 { ok: true, text: 'Business plan com dados reais' },
-                { ok: false, text: 'Conselho Estratégico v2 (completar)' },
+                { ok: true, text: 'Ward Platform — central de operações (Mineração, Swipe, Tarefas, Brandbook)' },
+                { ok: true, text: 'Meta Ad Library API integrada e testada' },
+                { ok: false, text: 'Conselho Estratégico v2 (transcrições pendentes)' },
                 { ok: false, text: 'Playbook de Criativos (antes do shoot)' },
                 { ok: false, text: 'Playbook de Mineração (3-5 SKUs do teste)' },
               ]
@@ -94,10 +96,15 @@ export default function RoadmapPage() {
             {[
               { mod: 'Meta Ad Library', status: '✅', desc: 'Busca concorrentes em NL/BE/DE/FR/GB' },
               { mod: 'Token Manager', status: '✅', desc: 'npm run refresh-token — 60 dias' },
-              { mod: 'AliExpress API', status: '📋', desc: 'Mineração: preço, reviews, variações' },
+              { mod: 'Mineração de Produtos UI', status: '✅', desc: 'Fetch + Claude Vision score + filtros' },
+              { mod: 'Swipe File', status: '✅', desc: 'Meta Ads + upload de imagem' },
+              { mod: 'Tarefas / Kanban', status: '✅', desc: 'Kanban com subtarefas, tags, responsável' },
+              { mod: 'Brandbook Digital', status: '✅', desc: '9 seções — Visão, Voz, Avatar, Fundadora...' },
+              { mod: 'CF Worker Proxy', status: '✅', desc: 'Proxy AliExpress para fetch no browser' },
+              { mod: 'AliExpress API Oficial', status: '🔄', desc: 'Open Platform API — registrar app' },
               { mod: 'IXSpy Export Processor', status: '📋', desc: 'Produtos bestsellers por país/categoria' },
               { mod: 'Kalodata Export Processor', status: '📋', desc: 'Análise de produtos em alta' },
-              { mod: 'Claude Analyzer', status: '📋', desc: 'Analisar Ad Library + produtos' },
+              { mod: 'Claude Analyzer de Ads', status: '📋', desc: 'Analisar Ad Library com Claude' },
             ].map(m => (
               <div key={m.mod} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', paddingBottom: 6, borderBottom: '1px solid var(--border)' }}>
                 <span style={{ fontSize: 14, flexShrink: 0 }}>{m.status}</span>
