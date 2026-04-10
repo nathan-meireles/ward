@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Bookmark, Package, Megaphone, CheckSquare, BarChart2, Sun, Moon, FlaskConical, BookOpen } from 'lucide-react'
+import { Bookmark, Package, Megaphone, CheckSquare, BarChart2, Sun, Moon, FlaskConical, BookOpen, ChevronDown } from 'lucide-react'
 import { useEffect, useState } from 'react'
 
 const NAV = [
@@ -12,12 +12,26 @@ const NAV = [
   { href: '/criativos',  icon: Megaphone,    label: 'Criativos'  },
   { href: '/tarefas',    icon: CheckSquare,  label: 'Tarefas'    },
   { href: '/benchmark',  icon: BarChart2,    label: 'Benchmark'  },
-  { href: '/marca',      icon: BookOpen,     label: 'Marca'      },
+]
+
+const MARCA_SUBNAV = [
+  { href: '/marca',           label: 'Overview'    },
+  { href: '/marca/visao',     label: 'Visão'       },
+  { href: '/marca/voz',       label: 'Voz'         },
+  { href: '/marca/avatar',    label: 'Avatar'      },
+  { href: '/marca/fundadora', label: 'Fundadora'   },
+  { href: '/marca/concorrentes', label: 'Concorrentes' },
+  { href: '/marca/criativos', label: 'Criativos'   },
+  { href: '/marca/trafego',   label: 'Tráfego'     },
+  { href: '/marca/time',      label: 'Time'        },
+  { href: '/marca/roadmap',   label: 'Roadmap'     },
 ]
 
 export function Sidebar() {
   const pathname = usePathname()
   const [light, setLight] = useState(false)
+  const isMarcaActive = pathname.startsWith('/marca')
+  const [marcaOpen, setMarcaOpen] = useState(isMarcaActive)
 
   useEffect(() => {
     const saved = localStorage.getItem('theme')
@@ -26,6 +40,10 @@ export function Sidebar() {
       setLight(true)
     }
   }, [])
+
+  useEffect(() => {
+    if (isMarcaActive) setMarcaOpen(true)
+  }, [isMarcaActive])
 
   function toggleTheme() {
     const next = !light
@@ -92,6 +110,70 @@ export function Sidebar() {
             </Link>
           )
         })}
+
+        {/* Marca group */}
+        <div style={{ marginBottom: 2 }}>
+          <button
+            onClick={() => setMarcaOpen(o => !o)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 9,
+              padding: '8px 12px',
+              borderRadius: 'var(--radius-sm)',
+              width: '100%',
+              background: isMarcaActive ? 'var(--brand-dim)' : 'transparent',
+              border: 'none',
+              cursor: 'pointer',
+              color: isMarcaActive ? 'var(--brand)' : 'var(--text-3)',
+              fontWeight: isMarcaActive ? 600 : 400,
+              fontSize: 13.5,
+              transition: 'background 0.15s, color 0.15s',
+              borderLeft: isMarcaActive ? `2px solid var(--brand)` : '2px solid transparent',
+              textAlign: 'left',
+            }}
+          >
+            <BookOpen size={15} strokeWidth={isMarcaActive ? 2.2 : 1.8} />
+            <span style={{ flex: 1 }}>Marca</span>
+            <ChevronDown
+              size={12}
+              style={{
+                transition: 'transform 0.2s',
+                transform: marcaOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+                opacity: 0.6,
+              }}
+            />
+          </button>
+
+          {/* Sub-items */}
+          <div style={{
+            overflow: 'hidden',
+            maxHeight: marcaOpen ? `${MARCA_SUBNAV.length * 34}px` : '0px',
+            transition: 'max-height 0.25s ease',
+          }}>
+            {MARCA_SUBNAV.map(({ href, label }) => {
+              const active = pathname === href
+              return (
+                <Link key={href} href={href} style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  padding: '6px 12px 6px 36px',
+                  borderRadius: 'var(--radius-sm)',
+                  marginBottom: 1,
+                  textDecoration: 'none',
+                  color: active ? 'var(--brand)' : 'var(--text-4)',
+                  background: active ? 'var(--brand-dim)' : 'transparent',
+                  fontWeight: active ? 600 : 400,
+                  fontSize: 12.5,
+                  transition: 'background 0.15s, color 0.15s',
+                  borderLeft: active ? `2px solid var(--brand)` : '2px solid transparent',
+                }}>
+                  {label}
+                </Link>
+              )
+            })}
+          </div>
+        </div>
       </nav>
 
       {/* Footer */}

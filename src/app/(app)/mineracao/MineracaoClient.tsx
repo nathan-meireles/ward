@@ -716,7 +716,7 @@ function BulkActionBar({ count, onDelete, onExport, onClear }: {
 
 type SortKey = 'score' | 'date' | 'price' | 'orders'
 type FilterKey = 'all' | 'forte' | 'medio' | 'fraco' | 'error'
-type DateFilter = 'all' | 'today' | '7d' | '30d'
+type DateFilter = 'all' | 'custom'
 
 export function MineracaoClient() {
   const [products, setProducts] = useState<Product[]>([])
@@ -732,6 +732,8 @@ export function MineracaoClient() {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   const [search, setSearch] = useState('')
   const [dateFilter, setDateFilter] = useState<DateFilter>('all')
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [confirmAction, setConfirmAction] = useState<{ title: string; body: string; onConfirm: () => void } | null>(null)
 
@@ -935,11 +937,14 @@ export function MineracaoClient() {
       const q = search.toLowerCase()
       if (!p.title?.toLowerCase().includes(q) && !p.aliexpress_id?.includes(q)) return false
     }
-    if (dateFilter !== 'all') {
-      const diffDays = (now.getTime() - new Date(p.created_at).getTime()) / (1000 * 60 * 60 * 24)
-      if (dateFilter === 'today' && diffDays > 1) return false
-      if (dateFilter === '7d' && diffDays > 7) return false
-      if (dateFilter === '30d' && diffDays > 30) return false
+    if (dateFilter === 'custom') {
+      const created = new Date(p.created_at)
+      if (dateFrom && created < new Date(dateFrom)) return false
+      if (dateTo) {
+        const end = new Date(dateTo)
+        end.setHours(23, 59, 59, 999)
+        if (created > end) return false
+      }
     }
     return true
   })
@@ -1132,14 +1137,25 @@ export function MineracaoClient() {
           })}
 
           <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
-            <div style={{ position: 'relative' }}>
-              <select value={dateFilter} onChange={e => setDateFilter(e.target.value as DateFilter)} style={selectStyle}>
-                <option value="all">Todas as datas</option>
-                <option value="today">Hoje</option>
-                <option value="7d">Últimos 7 dias</option>
-                <option value="30d">Últimos 30 dias</option>
-              </select>
-              <ChevronDown size={11} style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-4)', pointerEvents: 'none' }} />
+            <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+              <input
+                type="date"
+                value={dateFrom}
+                onChange={e => { setDateFrom(e.target.value); setDateFilter(e.target.value || dateTo ? 'custom' : 'all') }}
+                className="form-input"
+                style={{ padding: '5px 8px', fontSize: 12, height: 30, width: 130 }}
+              />
+              <span style={{ color: 'var(--text-4)', fontSize: 12 }}>—</span>
+              <input
+                type="date"
+                value={dateTo}
+                onChange={e => { setDateTo(e.target.value); setDateFilter(dateFrom || e.target.value ? 'custom' : 'all') }}
+                className="form-input"
+                style={{ padding: '5px 8px', fontSize: 12, height: 30, width: 130 }}
+              />
+              {(dateFrom || dateTo) && (
+                <button onClick={() => { setDateFrom(''); setDateTo(''); setDateFilter('all') }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-4)', fontSize: 14, padding: '0 2px' }}>✕</button>
+              )}
             </div>
             <div style={{ position: 'relative' }}>
               <select value={sort} onChange={e => setSort(e.target.value as SortKey)} style={selectStyle}>
