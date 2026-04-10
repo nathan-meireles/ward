@@ -54,6 +54,17 @@ function clientExtractTitle(html: string): string | null {
     const clean = t[1].replace(/\s*[-|–].*AliExpress.*$/i, '').replace(/\s*[-|–].*$/, '').trim()
     if (isRealProductTitle(clean)) return clean
   }
+  // 4. Extract title from CDN image filename in summImagePathList
+  // AliExpress embeds the product title as the image filename: "Product-Name-Words.jpg_80x80.jpg"
+  const imgFilename = html.match(/summImagePathList[^[]*\[[^\]]*\/kf\/[^/]+\/([A-Za-z0-9][^"]+?)\.jpg[_"]/i)
+  if (imgFilename) {
+    const slug = imgFilename[1]
+    // Ignore hash-only filenames (no hyphens = no title)
+    if (slug.includes('-')) {
+      const title = slug.replace(/\.jpg.*$/, '').replace(/-/g, ' ').replace(/\s+/g, ' ').trim()
+      if (isRealProductTitle(title)) return title
+    }
+  }
   return null
 }
 
@@ -696,8 +707,8 @@ function ListRow({ product, onClick, selected, onToggleSelect }: {
 
 // ─── BULK ACTION BAR ──────────────────────────────────────────────────────────
 
-function BulkActionBar({ count, onDelete, onExport, onClear }: {
-  count: number; onDelete: () => void; onExport: () => void; onClear: () => void
+function BulkActionBar({ count, onDelete, onExport, onRefetch, onClear }: {
+  count: number; onDelete: () => void; onExport: () => void; onRefetch: () => void; onClear: () => void
 }) {
   return (
     <div style={{
@@ -716,6 +727,9 @@ function BulkActionBar({ count, onDelete, onExport, onClear }: {
         {count} sel.
       </span>
       <div style={{ width: 1, height: 16, background: 'var(--border-2)' }} />
+      <button onClick={onRefetch} className="btn btn-ghost" style={{ minHeight: 28, padding: '4px 10px' }}>
+        <RefreshCw size={12} /> Re-fetch
+      </button>
       <button onClick={onExport} className="btn btn-ghost" style={{ minHeight: 28, padding: '4px 10px' }}>
         <Download size={12} /> Exportar
       </button>
@@ -900,6 +914,60 @@ export function MineracaoClient() {
     })
   }
 
+  // Re-fetch data from AliExpress for a list of products (title + images + re-analyze)
+  async function handleRefetch(targetProducts: Product[]) {
+    if (!targetProducts.length) return
+    setAnalyzing(true)
+    setAnalyzeError(null)
+
+    try {
+      for (let i = 0; i < targetProducts.length; i++) {
+        setAnalyzeProgress({ current: i + 1, total: targetProducts.length })
+        const p = targetProducts[i]
+        const productId = p.aliexpress_id
+        if (!productId) continue
+
+        let payload: Record<string, unknown> = { productId, url: p.aliexpress_url }
+
+        try {
+          const targetUrl = `https://www.aliexpress.com/item/${productId}.html`
+          const proxyUrl = `${CF_WORKER}?url=${encodeURIComponent(targetUrl)}`
+          const html = await fetch(proxyUrl).then(r => r.text())
+
+          if (html.length > 5000) {
+            payload = {
+              ...payload,
+              title: clientExtractTitle(html),
+              images: clientExtractImages(html),
+              ...clientExtractPrice(html),
+              orders_count: clientExtractOrders(html),
+              ...clientExtractRating(html),
+              ...clientExtractSeller(html),
+            }
+          } else {
+            payload.fetchError = `HTML muito curto (${html.length} chars)`
+          }
+        } catch (e) {
+          payload.fetchError = e instanceof Error ? e.message : 'Erro de fetch'
+        }
+
+        try {
+          await fetch('/api/mineracao/analyze', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          })
+        } catch { /* continue on individual error */ }
+
+        await load()
+      }
+    } finally {
+      setAnalyzing(false)
+      setAnalyzeProgress(null)
+      setSelectedIds(new Set())
+    }
+  }
+
   async function handleImageSubmit(id: string, imageUrl: string) {
     await fetch('/api/mineracao/analyze-image', {
       method: 'POST',
@@ -1038,6 +1106,11 @@ export function MineracaoClient() {
           {stats.error > 0 && (
             <button onClick={handleDeleteErrors} className="btn btn-ghost" style={{ color: 'var(--error)' }}>
               <Trash2 size={12} /> Erros ({stats.error})
+            </button>
+          )}
+          {products.length > 0 && (
+            <button onClick={() => handleRefetch(products)} disabled={analyzing} className="btn btn-ghost" title="Re-fetch todos os produtos do AliExpress">
+              <RefreshCw size={14} /> Re-fetch todos
             </button>
           )}
           {products.length > 0 && (
@@ -1288,6 +1361,7 @@ export function MineracaoClient() {
           count={selectedIds.size}
           onDelete={handleDeleteSelected}
           onExport={() => exportCSV(products.filter(p => selectedIds.has(p.id)))}
+          onRefetch={() => handleRefetch(products.filter(p => selectedIds.has(p.id)))}
           onClear={() => setSelectedIds(new Set())}
         />
       )}
