@@ -3,6 +3,64 @@
 import { useEffect, useState, useCallback } from 'react'
 import { Trash2, ExternalLink, Loader2, Plus, RefreshCw, ImagePlus, X, ChevronDown, LayoutGrid, List } from 'lucide-react'
 
+// ─── CLIENT-SIDE ALIEXPRESS PARSER ────────────────────────────────────────────
+// Roda no browser do usuário (IP residencial) → não é bloqueado pelo AliExpress
+
+const CF_WORKER = 'https://ali-proxy.nathan-meireles.workers.dev'
+
+function clientExtractProductId(url: string): string | null {
+  const m = url.match(/\/item\/(\d+)/)
+  return m ? m[1] : null
+}
+
+function clientExtractTitle(html: string): string | null {
+  const og = html.match(/<meta[^>]+property="og:title"[^>]+content="([^"]+)"/i)
+  if (og) return og[1].replace(/\s*[-|].*AliExpress.*$/i, '').trim()
+  const t = html.match(/<title[^>]*>([^<]+)<\/title>/i)
+  return t ? t[1].replace(/\s*[-|].*$/, '').trim() : null
+}
+
+function clientExtractImages(html: string): string[] {
+  const images: string[] = []
+  const og = html.match(/<meta[^>]+property="og:image"[^>]+content="([^"]+)"/i)
+  if (og) images.push(og[1].split('?')[0])
+  const re = /"(https:\/\/ae\d+\.alicdn\.com\/kf\/[^"]+\.(?:jpg|jpeg|png|webp))"/gi
+  let m
+  while ((m = re.exec(html)) !== null) {
+    const u = m[1].split('?')[0]
+    if (!images.includes(u)) images.push(u)
+    if (images.length >= 6) break
+  }
+  return images
+}
+
+function clientExtractPrice(html: string): { min: number | null; max: number | null } {
+  const r = html.match(/"minPrice"\s*:\s*"?([0-9.]+)"?[^}]{0,200}"maxPrice"\s*:\s*"?([0-9.]+)"?/)
+  if (r) return { min: parseFloat(r[1]), max: parseFloat(r[2]) }
+  const a = html.match(/"formatedActivityPrice"\s*:\s*"([^"]+)"/)
+  if (a) {
+    const nums = a[1].match(/[0-9]+[.,][0-9]+/g)
+    if (nums) {
+      const prices = nums.map(n => parseFloat(n.replace(',', '.')))
+      return { min: Math.min(...prices), max: Math.max(...prices) }
+    }
+  }
+  return { min: null, max: null }
+}
+
+function clientExtractOrders(html: string): string | null {
+  const m = html.match(/"formatTradeCount"\s*:\s*"([^"]+)"/)
+  if (m) return m[1]
+  const m2 = html.match(/"tradeCount"\s*:\s*"?(\d+)"?/)
+  return m2 ? m2[1] : null
+}
+
+function clientExtractRating(html: string) {
+  const r = html.match(/"averageStar"\s*:\s*"?([0-9.]+)"?/)
+  const c = html.match(/"totalValidNum"\s*:\s*"?(\d+)"?/)
+  return { rating: r ? parseFloat(r[1]) : null, reviewCount: c ? parseInt(c[1]) : null }
+}
+
 interface Product {
   id: string
   aliexpress_id: string | null
@@ -429,11 +487,43 @@ export function MineracaoClient() {
     try {
       for (let i = 0; i < urls.length; i++) {
         setAnalyzeProgress({ current: i + 1, total: urls.length })
+        const rawUrl = urls[i]
+        const productId = clientExtractProductId(rawUrl)
+
+        if (!productId) {
+          setAnalyzeError(`URL inválida: ${rawUrl.slice(0, 60)}`)
+          continue
+        }
+
+        let payload: Record<string, unknown> = { productId, url: rawUrl }
+
+        try {
+          // Fetch do browser (IP residencial → não bloqueado pelo AliExpress)
+          const targetUrl = `https://www.aliexpress.com/item/${productId}.html`
+          const proxyUrl = `${CF_WORKER}?url=${encodeURIComponent(targetUrl)}`
+          const html = await fetch(proxyUrl).then(r => r.text())
+
+          if (html.length > 5000) {
+            payload = {
+              ...payload,
+              title: clientExtractTitle(html),
+              images: clientExtractImages(html),
+              ...clientExtractPrice(html),
+              orders_count: clientExtractOrders(html),
+              ...clientExtractRating(html),
+            }
+          } else {
+            payload.fetchError = `HTML muito curto (${html.length} chars)`
+          }
+        } catch (e) {
+          payload.fetchError = e instanceof Error ? e.message : 'Erro de fetch'
+        }
+
         try {
           const res = await fetch('/api/mineracao/analyze', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ urls: [urls[i]] }),
+            body: JSON.stringify(payload),
           })
           if (!res.ok) {
             const text = await res.text()
@@ -442,6 +532,7 @@ export function MineracaoClient() {
         } catch (e) {
           setAnalyzeError(e instanceof Error ? e.message : 'Erro de rede')
         }
+
         await load()
       }
     } finally {

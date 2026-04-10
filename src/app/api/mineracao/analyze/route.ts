@@ -4,6 +4,8 @@ import Anthropic from '@anthropic-ai/sdk'
 
 export const maxDuration = 60
 
+type ImageMediaType = 'image/jpeg' | 'image/png' | 'image/webp' | 'image/gif'
+
 function sb() {
   return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -11,143 +13,18 @@ function sb() {
   )
 }
 
-// ─── EXTRAÇÃO DE DADOS DO HTML ─────────────────────────────────────────────
-
-function extractProductId(url: string): string | null {
-  const m = url.match(/\/item\/(\d+)/)
-  return m ? m[1] : null
-}
-
-function extractTitle(html: string): string | null {
-  const og = html.match(/<meta[^>]+property="og:title"[^>]+content="([^"]+)"/i)
-  if (og) return og[1].replace(/\s*[-|].*AliExpress.*$/i, '').trim()
-  const title = html.match(/<title[^>]*>([^<]+)<\/title>/i)
-  if (title) return title[1].replace(/\s*[-|].*$/, '').trim()
-  return null
-}
-
-function extractImages(html: string): string[] {
-  const images: string[] = []
-
-  // og:image (always first)
-  const og = html.match(/<meta[^>]+property="og:image"[^>]+content="([^"]+)"/i)
-  if (og) images.push(og[1].split('?')[0])
-
-  // AliExpress CDN images no JSON
-  const cdnMatches = html.matchAll(/"(https:\/\/ae\d+\.alicdn\.com\/kf\/[^"]+\.(jpg|jpeg|png|webp))"/gi)
-  for (const m of cdnMatches) {
-    const url = m[1].split('?')[0]
-    if (!images.includes(url)) images.push(url)
-    if (images.length >= 6) break
-  }
-
-  return images
-}
-
-function extractPrice(html: string): { min: number | null; max: number | null } {
-  const range = html.match(/"minPrice"\s*:\s*"?([0-9.]+)"?[^}]{0,200}"maxPrice"\s*:\s*"?([0-9.]+)"?/)
-  if (range) return { min: parseFloat(range[1]), max: parseFloat(range[2]) }
-  const act = html.match(/"formatedActivityPrice"\s*:\s*"([^"]+)"/)
-  if (act) {
-    const nums = act[1].match(/[0-9]+[.,][0-9]+/g)
-    if (nums) {
-      const prices = nums.map(n => parseFloat(n.replace(',', '.')))
-      return { min: Math.min(...prices), max: Math.max(...prices) }
-    }
-  }
-  return { min: null, max: null }
-}
-
-function extractOrders(html: string): string | null {
-  const m = html.match(/"formatTradeCount"\s*:\s*"([^"]+)"/)
-  if (m) return m[1]
-  const m2 = html.match(/"tradeCount"\s*:\s*"?(\d+)"?/)
-  if (m2) return m2[1]
-  return null
-}
-
-function extractRating(html: string): { rating: number | null; reviewCount: number | null } {
-  const r = html.match(/"averageStar"\s*:\s*"?([0-9.]+)"?/)
-  const c = html.match(/"totalValidNum"\s*:\s*"?(\d+)"?/)
-  return {
-    rating: r ? parseFloat(r[1]) : null,
-    reviewCount: c ? parseInt(c[1]) : null,
-  }
-}
-
-// ─── FETCH ALIEXPRESS ──────────────────────────────────────────────────────
-
-async function fetchAliExpress(productId: string): Promise<string> {
-  const targetUrl = `https://www.aliexpress.com/item/${productId}.html`
-  const workerUrl = (process.env.CF_WORKER_URL ?? '').trim().replace(/\/$/, '')
-
-  const errors: string[] = []
-
-  // Tentativa 1: Cloudflare Worker
-  if (workerUrl) {
-    try {
-      const proxyUrl = `${workerUrl}?url=${encodeURIComponent(targetUrl)}`
-      console.log('[ali-fetch] worker:', proxyUrl)
-      const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(25000) })
-      const html = await res.text()
-      console.log('[ali-fetch] worker response:', res.status, html.length, 'chars')
-      if (html.length > 5000) return html
-      errors.push(`Worker retornou ${html.length} chars (esperado >5000)`)
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e)
-      errors.push(`Worker error: ${msg}`)
-      console.error('[ali-fetch] worker failed:', msg)
-    }
-  } else {
-    errors.push('CF_WORKER_URL não configurado')
-    console.warn('[ali-fetch] CF_WORKER_URL not set')
-  }
-
-  // Tentativa 2: fetch direto mobile UA
-  const directUrls = [
-    `https://m.aliexpress.com/item/${productId}.html`,
-    `https://fr.aliexpress.com/item/${productId}.html`,
-    `https://www.aliexpress.com/item/${productId}.html`,
-  ]
-
-  for (const url of directUrls) {
-    try {
-      const res = await fetch(url, {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-          'Accept-Language': 'en-US,en;q=0.9',
-          'Cache-Control': 'no-cache',
-        },
-        redirect: 'follow',
-        signal: AbortSignal.timeout(15000),
-      })
-      const html = await res.text()
-      if (html.length > 5000) return html
-      errors.push(`Direct ${url}: ${html.length} chars`)
-    } catch (e) {
-      errors.push(`Direct ${url}: ${e instanceof Error ? e.message : String(e)}`)
-    }
-  }
-
-  throw new Error(`Fetch falhou: ${errors.join(' | ')}`)
-}
-
 // ─── DOWNLOAD DE IMAGEM → BASE64 ───────────────────────────────────────────
-
-type ImageMediaType = 'image/jpeg' | 'image/png' | 'image/webp' | 'image/gif'
 
 async function imageToBase64(url: string): Promise<{ data: string; mediaType: ImageMediaType } | null> {
   try {
     const res = await fetch(url, {
       headers: { 'Referer': 'https://www.aliexpress.com/' },
-      signal: AbortSignal.timeout(10000),
+      signal: AbortSignal.timeout(15000),
     })
     if (!res.ok) return null
     const buffer = await res.arrayBuffer()
     const base64 = Buffer.from(buffer).toString('base64')
-    const contentType = res.headers.get('content-type') ?? 'image/jpeg'
-    const mediaType = (contentType.split(';')[0].trim() || 'image/jpeg') as ImageMediaType
+    const mediaType = ((res.headers.get('content-type') ?? 'image/jpeg').split(';')[0].trim()) as ImageMediaType
     return { data: base64, mediaType }
   } catch {
     return null
@@ -187,31 +64,23 @@ Rules:
 - Base score ONLY on visual appearance, not text or title`
 
 async function analyzeWithClaude(images: string[]): Promise<{
-  score: number
-  label: string
-  reasoning: string
-  visual_traits: string[]
+  score: number; label: string; reasoning: string; visual_traits: string[]
 } | null> {
   const apiKey = process.env.ANTHROPIC_API_KEY
   if (!apiKey) return null
 
   const client = new Anthropic({ apiKey })
-
-  // Baixa até 3 imagens
   const imageContents: Anthropic.ImageBlockParam[] = []
+
   for (const imgUrl of images.slice(0, 3)) {
     const img = await imageToBase64(imgUrl)
     if (img) {
       imageContents.push({
         type: 'image',
-        source: {
-          type: 'base64',
-          media_type: img.mediaType,
-          data: img.data,
-        },
+        source: { type: 'base64', media_type: img.mediaType, data: img.data },
       })
     }
-    if (imageContents.length >= 2) break // máx 2 imagens para não estourar tokens
+    if (imageContents.length >= 2) break
   }
 
   if (imageContents.length === 0) return null
@@ -220,17 +89,11 @@ async function analyzeWithClaude(images: string[]): Promise<{
     const msg = await client.messages.create({
       model: 'claude-haiku-4-5-20251001',
       max_tokens: 400,
-      messages: [
-        {
-          role: 'user',
-          content: [
-            ...imageContents,
-            { type: 'text', text: NOTREGLR_PROMPT },
-          ],
-        },
-      ],
+      messages: [{
+        role: 'user',
+        content: [...imageContents, { type: 'text', text: NOTREGLR_PROMPT }],
+      }],
     })
-
     const text = msg.content[0].type === 'text' ? msg.content[0].text : ''
     const jsonMatch = text.match(/\{[\s\S]+\}/)
     if (!jsonMatch) return null
@@ -240,98 +103,90 @@ async function analyzeWithClaude(images: string[]): Promise<{
   }
 }
 
-// ─── HANDLER PRINCIPAL ─────────────────────────────────────────────────────
+// ─── HANDLER ───────────────────────────────────────────────────────────────
 
 export async function POST(request: NextRequest) {
   try {
-  const supabase = sb()
-  const body = await request.json()
-  const urls: string[] = body?.urls ?? []
+    const supabase = sb()
+    const body = await request.json()
 
-  if (!urls?.length) return NextResponse.json({ error: 'URLs obrigatórias' }, { status: 400 })
-
-  const results = []
-
-  for (const rawUrl of urls) {
-    const url = rawUrl.trim()
-    if (!url) continue
-
-    const productId = extractProductId(url)
-    if (!productId) {
-      results.push({ url, error: 'URL inválida' })
-      continue
+    const {
+      productId,
+      url,
+      title,
+      images,
+      min: priceMin,
+      max: priceMax,
+      orders_count,
+      rating,
+      reviewCount,
+      fetchError,
+    } = body as {
+      productId: string
+      url: string
+      title?: string
+      images?: string[]
+      min?: number
+      max?: number
+      orders_count?: string
+      rating?: number
+      reviewCount?: number
+      fetchError?: string
     }
 
-    // Inserir como pending
+    if (!productId) return NextResponse.json({ error: 'productId obrigatório' }, { status: 400 })
+
+    const aliexpress_url = `https://www.aliexpress.com/item/${productId}.html`
+
+    // Se não tiver imagens (fetch falhou no cliente), salvar como erro
+    if (fetchError || !images?.length) {
+      await supabase.from('mineracao').upsert({
+        aliexpress_id: productId,
+        aliexpress_url,
+        title: title ?? null,
+        status: 'error',
+        error_msg: fetchError ?? 'Sem imagens',
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'aliexpress_id' })
+      return NextResponse.json({ ok: true, error: fetchError })
+    }
+
+    // Salvar como analyzing
     const { data: inserted } = await supabase
       .from('mineracao')
       .upsert({
         aliexpress_id: productId,
-        aliexpress_url: `https://www.aliexpress.com/item/${productId}.html`,
+        aliexpress_url,
+        title: title ?? null,
+        price_min: priceMin ?? null,
+        price_max: priceMax ?? null,
+        orders_count: orders_count ?? null,
+        rating: rating ?? null,
+        review_count: reviewCount ?? null,
+        images: images ?? [],
         status: 'analyzing',
+        error_msg: null,
+        updated_at: new Date().toISOString(),
       }, { onConflict: 'aliexpress_id' })
       .select()
       .single()
 
     const recordId = inserted?.id
 
-    try {
-      // 1. Fetch HTML
-      const html = await fetchAliExpress(productId)
+    // Analisar com Claude Vision
+    const analysis = await analyzeWithClaude(images)
 
-      // 2. Extrair dados
-      const title = extractTitle(html)
-      const images = extractImages(html)
-      const { min: priceMin, max: priceMax } = extractPrice(html)
-      const ordersCount = extractOrders(html)
-      const { rating, reviewCount } = extractRating(html)
+    await supabase.from('mineracao').update({
+      notreglr_score: analysis?.score ?? null,
+      notreglr_label: analysis?.label ?? null,
+      notreglr_reasoning: analysis?.reasoning ?? null,
+      status: analysis ? 'done' : 'partial',
+      updated_at: new Date().toISOString(),
+    }).eq('id', recordId ?? '')
 
-      // 3. Analisar com Claude Vision
-      const analysis = await analyzeWithClaude(images)
-
-      // 4. Salvar resultado
-      const update = {
-        title,
-        price_min: priceMin,
-        price_max: priceMax,
-        orders_count: ordersCount,
-        rating,
-        review_count: reviewCount,
-        images,
-        notreglr_score: analysis?.score ?? null,
-        notreglr_label: analysis?.label ?? null,
-        notreglr_reasoning: analysis?.reasoning ?? null,
-        status: analysis ? 'done' : (title ? 'partial' : 'error'),
-        error_msg: !analysis && !title ? 'Sem dados' : null,
-        updated_at: new Date().toISOString(),
-      }
-
-      if (recordId) {
-        await supabase.from('mineracao').update(update).eq('id', recordId)
-      } else {
-        await supabase.from('mineracao').insert({
-          aliexpress_id: productId,
-          aliexpress_url: `https://www.aliexpress.com/item/${productId}.html`,
-          ...update,
-        })
-      }
-
-      results.push({ url, productId, title, score: analysis?.score, label: analysis?.label })
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Erro desconhecido'
-      if (recordId) {
-        await supabase.from('mineracao').update({ status: 'error', error_msg: msg }).eq('id', recordId)
-      }
-      results.push({ url, productId, error: msg })
-    }
-
-    // Delay entre produtos
-    await new Promise(r => setTimeout(r, 1000))
-  }
-
-  return NextResponse.json({ results })
+    return NextResponse.json({ ok: true, score: analysis?.score, label: analysis?.label })
   } catch (err) {
-    const msg = err instanceof Error ? `${err.message}\n${err.stack}` : String(err)
+    const msg = err instanceof Error ? `${err.message}\n${err.stack?.slice(0, 300)}` : String(err)
     console.error('POST /api/mineracao/analyze FATAL:', msg)
     return NextResponse.json({ error: msg }, { status: 500 })
   }
