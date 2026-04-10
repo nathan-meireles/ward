@@ -13,6 +13,17 @@ function clientExtractProductId(url: string): string | null {
   return m ? m[1] : null
 }
 
+// ─── EMBEDDED JSON EXTRACTOR ─────────────────────────────────────────────────
+// AliExpress embeds product data as JSON in the page HTML.
+// We try to find the main data object and extract from it.
+
+function extractJsonValue(html: string, key: string): string | null {
+  // Try both quoted-string and number value forms
+  const m = html.match(new RegExp(`"${key}"\\s*:\\s*"([^"]{1,500})"`, 'i'))
+    ?? html.match(new RegExp(`"${key}"\\s*:\\s*([0-9.]+)`, 'i'))
+  return m ? m[1] : null
+}
+
 function clientExtractTitle(html: string): string | null {
   // 1. og:title — handle both attribute orderings
   let m = html.match(/property=["']og:title["'][^>]+content=["']([^"']{5,}?)["']/i)
@@ -21,13 +32,12 @@ function clientExtractTitle(html: string): string | null {
     const t = m[1].replace(/\s*[-|].*AliExpress.*$/i, '').trim()
     if (t.length > 5 && !/^\d+$/.test(t)) return t
   }
-  // 2. JSON "subject" key (product object)
-  m = html.match(/"subject"\s*:\s*"([^"]{8,250})"/)
-  if (m && !/^\d+$/.test(m[1])) return m[1]
-  // 3. productTitle key
-  m = html.match(/"productTitle"\s*:\s*"([^"]{8,250})"/)
-  if (m) return m[1]
-  // 4. <title> fallback
+  // 2. Try multiple JSON key names used by AliExpress
+  for (const key of ['subject', 'productTitle', 'title', 'name', 'pdpProductTitle']) {
+    const v = extractJsonValue(html, key)
+    if (v && v.length > 5 && !/^\d+$/.test(v)) return v
+  }
+  // 3. <title> fallback
   const t = html.match(/<title[^>]*>([^<]+)<\/title>/i)
   return t ? t[1].replace(/\s*[-|].*$/, '').trim() : null
 }
@@ -49,80 +59,120 @@ function clientExtractImages(html: string): string[] {
 }
 
 function clientExtractPrice(html: string): { min: number | null; max: number | null } {
+  // Try min/max pair first
   const r = html.match(/"minPrice"\s*:\s*"?([0-9.]+)"?[^}]{0,300}"maxPrice"\s*:\s*"?([0-9.]+)"?/)
   if (r) return { min: parseFloat(r[1]), max: parseFloat(r[2]) }
-  const sale = html.match(/"salePrice"\s*:\s*"[^0-9]*([0-9]+[.,][0-9]+)"/)
-  if (sale) { const v = parseFloat(sale[1].replace(',', '.')); return { min: v, max: v } }
-  const activity = html.match(/"formatedActivityPrice"\s*:\s*"([^"]+)"/)
-  if (activity) {
-    const nums = activity[1].match(/[0-9]+[.,][0-9]+/g)
+
+  // Try various single-price keys (values like "US $12.34" or just "12.34")
+  const priceKeys = ['salePrice', 'formatedActivityPrice', 'activityPrice', 'discountPrice', 'originalPrice', 'price', 'minActivityAmount', 'originalPriceShow']
+  for (const key of priceKeys) {
+    const v = extractJsonValue(html, key)
+    if (!v) continue
+    const nums = v.match(/[0-9]+[.,][0-9]+/g)
     if (nums) {
       const prices = nums.map(n => parseFloat(n.replace(',', '.')))
       return { min: Math.min(...prices), max: Math.max(...prices) }
     }
+    const plain = parseFloat(v.replace(',', '.'))
+    if (!isNaN(plain) && plain > 0) return { min: plain, max: plain }
   }
-  const generic = html.match(/"price"\s*:\s*"?[^0-9"]*([0-9]+[.,][0-9]+)"?/)
-  if (generic) { const v = parseFloat(generic[1].replace(',', '.')); return { min: v, max: v } }
   return { min: null, max: null }
 }
 
 function clientExtractOrders(html: string): string | null {
-  const patterns = [
-    /"formatTradeCount"\s*:\s*"([^"]+)"/,
-    /"tradeCount"\s*:\s*"([^"]+)"/,
-    /"soldCount"\s*:\s*"?(\d+)"?/,
-    /"totalOrders"\s*:\s*"?(\d+)"?/,
-    /(\d[\d,]+)\s*(?:sold|orders|vendidos)/i,
-  ]
-  for (const p of patterns) {
-    const m = html.match(p)
-    if (m) return m[1]
+  const keys = ['formatTradeCount', 'tradeCount', 'soldCount', 'totalOrders', 'orderCount', 'salesVolume', 'sold']
+  for (const key of keys) {
+    const v = extractJsonValue(html, key)
+    if (v && v.trim() !== '0') return v
   }
+  // Inline text like "12k+ sold" or "3,200 sold"
+  const m = html.match(/(\d[\d,k+.]*)\s*(?:sold|orders|vendidos)/i)
+  if (m) return m[1]
   return null
 }
 
 function clientExtractRating(html: string) {
-  const rPatterns = [
-    /"averageStar"\s*:\s*"?([0-9.]+)"?/,
-    /"averageStarRate"\s*:\s*"?([0-9.]+)"?/,
-    /"totalAverageStar"\s*:\s*"?([0-9.]+)"?/,
-    /"starRating"\s*:\s*"?([0-9.]+)"?/,
-    /"rating"\s*:\s*"?([0-9.]+)"?/,
-  ]
-  const cPatterns = [
-    /"totalValidNum"\s*:\s*"?(\d+)"?/,
-    /"evaluateCount"\s*:\s*"?(\d+)"?/,
-    /"feedbackCount"\s*:\s*"?(\d+)"?/,
-    /"reviewCount"\s*:\s*"?(\d+)"?/,
-  ]
+  const rKeys = ['averageStar', 'averageStarRate', 'totalAverageStar', 'starRating', 'score', 'ratingValue', 'averageScore']
+  const cKeys = ['totalValidNum', 'evaluateCount', 'feedbackCount', 'reviewCount', 'totalEvaluations', 'reviewTotal', 'ratingCount']
+
   let rating = null, reviewCount = null
-  for (const p of rPatterns) {
-    const m = html.match(p)
-    if (m) { const v = parseFloat(m[1]); if (v > 0 && v <= 5) { rating = v; break } }
+
+  for (const key of rKeys) {
+    const v = extractJsonValue(html, key)
+    if (v) {
+      const n = parseFloat(v)
+      if (n > 0 && n <= 5) { rating = n; break }
+    }
   }
-  for (const p of cPatterns) { const m = html.match(p); if (m) { reviewCount = parseInt(m[1]); break } }
+
+  // Also try JSON-LD structured data (often has ratingValue + ratingCount)
+  const jsonLdMatch = html.match(/<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi)
+  if (jsonLdMatch) {
+    for (const block of jsonLdMatch) {
+      try {
+        const json = JSON.parse(block.replace(/<script[^>]*>|<\/script>/gi, ''))
+        const agg = json?.aggregateRating ?? json?.['aggregateRating']
+        if (agg) {
+          if (agg.ratingValue && !rating) {
+            const n = parseFloat(agg.ratingValue)
+            if (n > 0 && n <= 5) rating = n
+          }
+          if (agg.reviewCount && !reviewCount) reviewCount = parseInt(agg.reviewCount)
+          if (agg.ratingCount && !reviewCount) reviewCount = parseInt(agg.ratingCount)
+        }
+      } catch { /* ignore */ }
+    }
+  }
+
+  for (const key of cKeys) {
+    if (reviewCount !== null) break
+    const v = extractJsonValue(html, key)
+    if (v) {
+      const n = parseInt(v)
+      if (n > 0) { reviewCount = n; break }
+    }
+  }
+
   return { rating, reviewCount }
 }
 
 function clientExtractSeller(html: string): { seller_name: string | null; seller_positive_rate: string | null } {
-  const namePatterns = [
-    /"storeName"\s*:\s*"([^"]+)"/,
-    /"storeTitle"\s*:\s*"([^"]+)"/,
-    /"sellerName"\s*:\s*"([^"]+)"/,
-    /"shopName"\s*:\s*"([^"]+)"/,
-  ]
-  const ratePatterns = [
-    /"sellerPositiveRate"\s*:\s*"([0-9.]+%?)"/,
-    /"positiveRate"\s*:\s*"([0-9.]+%?)"/,
-    /"storeFeedbackScore"\s*:\s*"?([0-9.]+)"?/,
-  ]
   let seller_name = null, seller_positive_rate = null
-  for (const p of namePatterns) { const m = html.match(p); if (m) { seller_name = m[1]; break } }
-  for (const p of ratePatterns) {
-    const m = html.match(p)
-    if (m) { seller_positive_rate = m[1].includes('%') ? m[1] : m[1] + '%'; break }
+
+  for (const key of ['storeName', 'storeTitle', 'sellerName', 'shopName', 'sellerStoreName', 'shopTitle']) {
+    const v = extractJsonValue(html, key)
+    if (v && v.length > 1) { seller_name = v; break }
+  }
+  for (const key of ['sellerPositiveRate', 'positiveRate', 'storeFeedbackScore', 'positivePercent']) {
+    const v = extractJsonValue(html, key)
+    if (v) { seller_positive_rate = v.includes('%') ? v : v + '%'; break }
   }
   return { seller_name, seller_positive_rate }
+}
+
+// ─── CONFIRM MODAL ────────────────────────────────────────────────────────────
+
+function ConfirmModal({ title, body, confirmLabel = 'Confirmar', onConfirm, onCancel }: {
+  title: string; body: string; confirmLabel?: string
+  onConfirm: () => void; onCancel: () => void
+}) {
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => { if (e.key === 'Escape') onCancel() }
+    window.addEventListener('keydown', h)
+    return () => window.removeEventListener('keydown', h)
+  }, [onCancel])
+  return (
+    <div className="modal-backdrop" onClick={e => { if (e.target === e.currentTarget) onCancel() }}>
+      <div className="modal" style={{ width: '100%', maxWidth: 400 }}>
+        <h2 style={{ fontFamily: 'var(--font-alt)', fontSize: 20, fontWeight: 400, color: 'var(--text)', marginBottom: 10 }}>{title}</h2>
+        <p style={{ fontFamily: 'var(--font)', fontSize: 13, color: 'var(--text-3)', lineHeight: 1.6, marginBottom: 24 }}>{body}</p>
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+          <button onClick={onCancel} className="btn btn-secondary">Cancelar</button>
+          <button onClick={onConfirm} className="btn btn-destructive">{confirmLabel}</button>
+        </div>
+      </div>
+    </div>
+  )
 }
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
@@ -234,11 +284,11 @@ function StatsBar({ products }: { products: Product[] }) {
       style={{ gridTemplateColumns: `repeat(${cells.length}, 1fr)`, borderRadius: 'var(--radius-lg)', overflow: 'hidden', marginBottom: 28 }}
     >
       {cells.map(({ label, value, color }) => (
-        <div key={label} style={{ padding: '14px 18px' }}>
-          <div style={{ fontSize: 9, color: 'var(--text-4)', fontFamily: 'var(--font-mono)', letterSpacing: '0.14em', textTransform: 'uppercase', marginBottom: 8 }}>
+        <div key={label} style={{ padding: '16px 20px' }}>
+          <div style={{ fontSize: 9, color: 'var(--text-4)', fontFamily: 'var(--font-mono)', letterSpacing: '0.14em', textTransform: 'uppercase', marginBottom: 10 }}>
             {label}
           </div>
-          <div style={{ fontSize: 26, fontWeight: 800, color, lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>
+          <div style={{ fontSize: 32, fontFamily: 'var(--font-alt)', color, lineHeight: 1 }}>
             {value}
           </div>
         </div>
@@ -683,6 +733,7 @@ export function MineracaoClient() {
   const [search, setSearch] = useState('')
   const [dateFilter, setDateFilter] = useState<DateFilter>('all')
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [confirmAction, setConfirmAction] = useState<{ title: string; body: string; onConfirm: () => void } | null>(null)
 
   const load = useCallback(async () => {
     const res = await fetch('/api/mineracao')
@@ -797,24 +848,37 @@ export function MineracaoClient() {
     setProducts(prev => prev.filter(p => p.status !== 'error'))
   }
 
-  async function handleDeleteAll() {
-    if (!confirm(`Remover todos os ${products.length} produtos?`)) return
-    await Promise.all(products.map(p =>
-      fetch('/api/mineracao', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: p.id }) })
-    ))
-    setProducts([])
-    setSelected(null)
-    setSelectedIds(new Set())
+  function handleDeleteAll() {
+    setConfirmAction({
+      title: 'Remover tudo',
+      body: `Isso vai remover todos os ${products.length} produtos minerados. Não dá pra desfazer.`,
+      onConfirm: async () => {
+        setConfirmAction(null)
+        await Promise.all(products.map(p =>
+          fetch('/api/mineracao', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: p.id }) })
+        ))
+        setProducts([])
+        setSelected(null)
+        setSelectedIds(new Set())
+      },
+    })
   }
 
-  async function handleDeleteSelected() {
-    if (!confirm(`Remover ${selectedIds.size} produto(s)?`)) return
-    const ids = Array.from(selectedIds)
-    await Promise.all(ids.map(id =>
-      fetch('/api/mineracao', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) })
-    ))
-    setProducts(prev => prev.filter(p => !selectedIds.has(p.id)))
-    setSelectedIds(new Set())
+  function handleDeleteSelected() {
+    const count = selectedIds.size
+    setConfirmAction({
+      title: `Remover ${count} produto${count !== 1 ? 's' : ''}`,
+      body: `Isso vai remover ${count} produto${count !== 1 ? 's' : ''} selecionado${count !== 1 ? 's' : ''}. Não dá pra desfazer.`,
+      onConfirm: async () => {
+        setConfirmAction(null)
+        const ids = Array.from(selectedIds)
+        await Promise.all(ids.map(id =>
+          fetch('/api/mineracao', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) })
+        ))
+        setProducts(prev => prev.filter(p => !selectedIds.has(p.id)))
+        setSelectedIds(new Set())
+      },
+    })
   }
 
   async function handleImageSubmit(id: string, imageUrl: string) {
@@ -1096,7 +1160,7 @@ export function MineracaoClient() {
           <div className="modal" style={{ width: '100%', maxWidth: 560 }}>
             <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 18 }}>
               <div>
-                <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 400, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'var(--text)', margin: 0, lineHeight: 1 }}>
+                <h2 style={{ fontFamily: 'var(--font-alt)', fontSize: 24, fontWeight: 400, color: 'var(--text)', margin: 0, lineHeight: 1 }}>
                   Analisar Produtos
                 </h2>
                 <p style={{ color: 'var(--text-4)', fontSize: 10, marginTop: 6, fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
@@ -1192,6 +1256,17 @@ export function MineracaoClient() {
           onDelete={handleDeleteSelected}
           onExport={() => exportCSV(products.filter(p => selectedIds.has(p.id)))}
           onClear={() => setSelectedIds(new Set())}
+        />
+      )}
+
+      {/* ── CONFIRM MODAL ── */}
+      {confirmAction && (
+        <ConfirmModal
+          title={confirmAction.title}
+          body={confirmAction.body}
+          confirmLabel="Remover"
+          onConfirm={confirmAction.onConfirm}
+          onCancel={() => setConfirmAction(null)}
         />
       )}
 
