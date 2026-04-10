@@ -918,9 +918,9 @@ export function MineracaoClient() {
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 28, gap: 16 }}>
         <div>
           <h1 style={{
-            fontFamily: 'var(--font-display)',
-            fontSize: 40, fontWeight: 400, letterSpacing: '0.04em',
-            textTransform: 'uppercase', color: 'var(--text)', margin: 0, lineHeight: 1,
+            fontFamily: 'var(--font-alt)',
+            fontSize: 36, fontWeight: 400, letterSpacing: '0.01em',
+            color: 'var(--text)', margin: 0, lineHeight: 1,
           }}>
             Mineração
           </h1>

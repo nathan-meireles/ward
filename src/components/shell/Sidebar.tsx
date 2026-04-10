@@ -38,19 +38,20 @@ export function Sidebar() {
       background: 'var(--surface-panel)',
       borderRight: '1px solid var(--border)',
       width: 216,
-      minHeight: '100dvh',
+      height: '100dvh',
       display: 'flex',
       flexDirection: 'column',
       flexShrink: 0,
       position: 'sticky',
       top: 0,
+      overflow: 'hidden',
     }}>
       {/* Logo */}
       <div style={{ padding: '22px 20px 18px' }}>
         <div style={{
-          fontFamily: 'var(--font-display)',
-          fontSize: 22,
-          letterSpacing: 3,
+          fontFamily: 'var(--font-alt)',
+          fontSize: 20,
+          letterSpacing: 1,
           color: 'var(--text)',
           lineHeight: 1,
           marginBottom: 3,
@@ -66,7 +67,7 @@ export function Sidebar() {
       <div style={{ height: 1, background: 'var(--border)', margin: '0 14px' }} />
 
       {/* Nav */}
-      <nav style={{ padding: '8px 8px', flex: 1 }}>
+      <nav style={{ padding: '8px 8px', flex: 1, overflowY: 'auto' }}>
         {NAV.map(({ href, icon: Icon, label }) => {
           const active = pathname.startsWith(href)
           return (

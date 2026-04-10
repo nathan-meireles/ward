@@ -208,10 +208,10 @@ body {
 }
 
 h1, h2, h3, h4, h5, h6 {
-  font-family: var(--font);
-  font-weight: 700;
+  font-family: var(--font-alt);  /* Calistoga */
+  font-weight: 400;
   color:       var(--text);
-  line-height: 1.25;
+  line-height: 1.2;
 }
 
 a { color: var(--brand); text-decoration: none; }

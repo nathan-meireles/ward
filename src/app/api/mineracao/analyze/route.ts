@@ -128,6 +128,8 @@ export async function POST(request: NextRequest) {
       orders_count,
       rating,
       reviewCount,
+      seller_name,
+      seller_positive_rate,
       fetchError,
     } = body as {
       productId: string
@@ -139,6 +141,8 @@ export async function POST(request: NextRequest) {
       orders_count?: string
       rating?: number
       reviewCount?: number
+      seller_name?: string
+      seller_positive_rate?: string
       fetchError?: string
     }
 
@@ -171,6 +175,8 @@ export async function POST(request: NextRequest) {
         orders_count: orders_count ?? null,
         rating: rating ?? null,
         review_count: reviewCount ?? null,
+        seller_name: seller_name ?? null,
+        seller_positive_rate: seller_positive_rate ?? null,
         images: images ?? [],
         status: 'analyzing',
         error_msg: null,
