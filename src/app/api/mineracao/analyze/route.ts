@@ -214,8 +214,10 @@ async function analyzeWithClaude(images: string[]): Promise<{
 // ─── HANDLER PRINCIPAL ─────────────────────────────────────────────────────
 
 export async function POST(request: NextRequest) {
+  try {
   const supabase = sb()
-  const { urls } = await request.json() as { urls: string[] }
+  const body = await request.json()
+  const urls: string[] = body?.urls ?? []
 
   if (!urls?.length) return NextResponse.json({ error: 'URLs obrigatórias' }, { status: 400 })
 
@@ -299,4 +301,9 @@ export async function POST(request: NextRequest) {
   }
 
   return NextResponse.json({ results })
+  } catch (err) {
+    const msg = err instanceof Error ? `${err.message}\n${err.stack}` : String(err)
+    console.error('POST /api/mineracao/analyze FATAL:', msg)
+    return NextResponse.json({ error: msg }, { status: 500 })
+  }
 }
