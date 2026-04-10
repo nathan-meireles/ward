@@ -2,15 +2,16 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Bookmark, Package, Megaphone, CheckSquare, BarChart2, Sun, Moon } from 'lucide-react'
+import { Bookmark, Package, Megaphone, CheckSquare, BarChart2, Sun, Moon, FlaskConical } from 'lucide-react'
 import { useEffect, useState } from 'react'
 
 const NAV = [
-  { href: '/swipe',     icon: Bookmark,    label: 'Swipe File'  },
-  { href: '/produtos',  icon: Package,     label: 'Produtos'    },
-  { href: '/criativos', icon: Megaphone,   label: 'Criativos'   },
-  { href: '/tarefas',   icon: CheckSquare, label: 'Tarefas'     },
-  { href: '/benchmark', icon: BarChart2,   label: 'Benchmark'   },
+  { href: '/swipe',      icon: Bookmark,     label: 'Swipe File' },
+  { href: '/mineracao',  icon: FlaskConical, label: 'Mineração'  },
+  { href: '/produtos',   icon: Package,      label: 'Produtos'   },
+  { href: '/criativos',  icon: Megaphone,    label: 'Criativos'  },
+  { href: '/tarefas',    icon: CheckSquare,  label: 'Tarefas'    },
+  { href: '/benchmark',  icon: BarChart2,    label: 'Benchmark'  },
 ]
 
 export function Sidebar() {
