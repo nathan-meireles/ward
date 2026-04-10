@@ -79,25 +79,25 @@ function extractRating(html: string): { rating: number | null; reviewCount: numb
 
 async function fetchAliExpress(productId: string): Promise<string> {
   const targetUrl = `https://www.aliexpress.com/item/${productId}.html`
-  const scraperKey = process.env.SCRAPERAPI_KEY
+  const workerUrl = process.env.CF_WORKER_URL // ex: https://ali-proxy.SEU_USUARIO.workers.dev
 
-  // Tentativa 1: ScraperAPI (se configurada)
-  if (scraperKey) {
+  // Tentativa 1: Cloudflare Worker (se configurado)
+  if (workerUrl) {
     try {
-      const proxyUrl = `https://api.scraperapi.com?api_key=${scraperKey}&url=${encodeURIComponent(targetUrl)}&render=false`
-      const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(30000) })
+      const proxyUrl = `${workerUrl}?url=${encodeURIComponent(targetUrl)}`
+      const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(25000) })
       const html = await res.text()
-      if (html.length > 5000 && html.includes('aliexpress')) return html
+      if (html.length > 5000) return html
     } catch {
       // fallback para fetch direto
     }
   }
 
-  // Tentativa 2: fetch direto com headers de browser
+  // Tentativa 2: fetch direto (mobile UA — funciona em alguns casos)
   const directUrls = [
-    `https://www.aliexpress.com/item/${productId}.html`,
-    `https://fr.aliexpress.com/item/${productId}.html`,
     `https://m.aliexpress.com/item/${productId}.html`,
+    `https://fr.aliexpress.com/item/${productId}.html`,
+    `https://www.aliexpress.com/item/${productId}.html`,
   ]
 
   for (const url of directUrls) {
@@ -118,7 +118,7 @@ async function fetchAliExpress(productId: string): Promise<string> {
       // tenta próxima URL
     }
   }
-  throw new Error('Não foi possível acessar o produto. Configure SCRAPERAPI_KEY no Vercel para análise automática.')
+  throw new Error('Não foi possível acessar o produto. Configure CF_WORKER_URL no Vercel.')
 }
 
 // ─── DOWNLOAD DE IMAGEM → BASE64 ───────────────────────────────────────────
