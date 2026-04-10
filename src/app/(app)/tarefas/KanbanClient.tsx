@@ -614,7 +614,7 @@ export function KanbanClient() {
     <div>
       {/* Page header */}
       <div style={{ marginBottom: 28 }}>
-        <h1 style={{ fontFamily: 'var(--font-alt)', fontSize: 36, fontWeight: 400, color: 'var(--text)', margin: 0, lineHeight: 1 }}>
+        <h1 style={{ fontFamily: 'var(--font-alt)', fontSize: 22, fontWeight: 400, color: 'var(--text)', margin: 0, lineHeight: 1 }}>
           Tarefas
         </h1>
         <p style={{ color: 'var(--text-4)', fontSize: 11, marginTop: 8, fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>

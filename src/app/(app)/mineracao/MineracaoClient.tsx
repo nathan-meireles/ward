@@ -24,22 +24,37 @@ function extractJsonValue(html: string, key: string): string | null {
   return m ? m[1] : null
 }
 
+// Rejects strings that look like React component names or code artifacts
+function isRealProductTitle(s: string): boolean {
+  if (!s || s.length < 8) return false
+  if (/^\d+$/.test(s)) return false
+  // Reject single CamelCase words (e.g. "ItemDetailResp", "PageDetail")
+  if (/^[A-Z][a-zA-Z0-9]+$/.test(s.trim())) return false
+  // Must contain at least one space, digit, or non-ASCII char (real titles have these)
+  if (!/[\s\d\u0080-\uFFFF]/.test(s)) return false
+  return true
+}
+
 function clientExtractTitle(html: string): string | null {
   // 1. og:title — handle both attribute orderings
   let m = html.match(/property=["']og:title["'][^>]+content=["']([^"']{5,}?)["']/i)
   if (!m) m = html.match(/content=["']([^"']{5,}?)["'][^>]+property=["']og:title["']/i)
   if (m) {
     const t = m[1].replace(/\s*[-|].*AliExpress.*$/i, '').trim()
-    if (t.length > 5 && !/^\d+$/.test(t)) return t
+    if (isRealProductTitle(t)) return t
   }
-  // 2. Try multiple JSON key names used by AliExpress
-  for (const key of ['subject', 'productTitle', 'title', 'name', 'pdpProductTitle']) {
+  // 2. Specific AliExpress product title keys (avoid generic 'title'/'name' that match components)
+  for (const key of ['subject', 'productTitle', 'pdpProductTitle', 'goodsTitle', 'itemTitle']) {
     const v = extractJsonValue(html, key)
-    if (v && v.length > 5 && !/^\d+$/.test(v)) return v
+    if (v && isRealProductTitle(v)) return v
   }
-  // 3. <title> fallback
-  const t = html.match(/<title[^>]*>([^<]+)<\/title>/i)
-  return t ? t[1].replace(/\s*[-|].*$/, '').trim() : null
+  // 3. <title> tag — usually "Product Name - AliExpress"
+  const t = html.match(/<title[^>]*>([^<]{10,}?)<\/title>/i)
+  if (t) {
+    const clean = t[1].replace(/\s*[-|–].*AliExpress.*$/i, '').replace(/\s*[-|–].*$/, '').trim()
+    if (isRealProductTitle(clean)) return clean
+  }
+  return null
 }
 
 function clientExtractImages(html: string): string[] {
@@ -235,6 +250,8 @@ function formatPrice(min: number | null, max: number | null): string | null {
 function cleanTitle(title: string | null, fallback: string): string {
   if (!title) return fallback
   if (/^\d{10,}$/.test(title.trim())) return fallback
+  // Reject single CamelCase component names that slipped through extraction
+  if (/^[A-Z][a-zA-Z0-9]+$/.test(title.trim())) return fallback
   return title
 }
 
@@ -988,7 +1005,7 @@ export function MineracaoClient() {
         <div>
           <h1 style={{
             fontFamily: 'var(--font-alt)',
-            fontSize: 36, fontWeight: 400, letterSpacing: '0.01em',
+            fontSize: 22, fontWeight: 400, letterSpacing: '0.01em',
             color: 'var(--text)', margin: 0, lineHeight: 1,
           }}>
             Mineração
