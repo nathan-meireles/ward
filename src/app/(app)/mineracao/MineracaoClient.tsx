@@ -226,21 +226,29 @@ export function MineracaoClient() {
     return () => clearInterval(timer)
   }, [products, load])
 
+  const [analyzeProgress, setAnalyzeProgress] = useState<{ current: number; total: number } | null>(null)
+
   async function handleAnalyze() {
     const urls = input.split('\n').map(u => u.trim()).filter(Boolean)
     if (!urls.length) return
     setAnalyzing(true)
     setShowInput(false)
     setInput('')
+
     try {
-      await fetch('/api/mineracao/analyze', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ urls }),
-      })
-      await load()
+      // Processa 1 URL por vez para evitar timeout do Vercel
+      for (let i = 0; i < urls.length; i++) {
+        setAnalyzeProgress({ current: i + 1, total: urls.length })
+        await fetch('/api/mineracao/analyze', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ urls: [urls[i]] }),
+        })
+        await load()
+      }
     } finally {
       setAnalyzing(false)
+      setAnalyzeProgress(null)
     }
   }
 
@@ -287,16 +295,22 @@ export function MineracaoClient() {
             <RefreshCw size={14} />
           </button>
           <button
-            onClick={() => setShowInput(true)}
+            onClick={() => !analyzing && setShowInput(true)}
+            disabled={analyzing}
             style={{
               background: 'var(--brand)', color: 'var(--bg)',
               border: 'none', borderRadius: 'var(--radius-sm)',
-              padding: '8px 14px', cursor: 'pointer',
+              padding: '8px 14px', cursor: analyzing ? 'default' : 'pointer',
               fontWeight: 600, fontSize: 13,
               display: 'flex', alignItems: 'center', gap: 6,
+              opacity: analyzing ? 0.7 : 1,
             }}
           >
-            <Plus size={14} /> Analisar URLs
+            {analyzing && analyzeProgress ? (
+              <><Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> {analyzeProgress.current}/{analyzeProgress.total}</>
+            ) : (
+              <><Plus size={14} /> Analisar URLs</>
+            )}
           </button>
         </div>
       </div>
