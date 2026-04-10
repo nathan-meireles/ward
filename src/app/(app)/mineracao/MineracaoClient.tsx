@@ -307,22 +307,15 @@ function DetailPanel({ product, onClose, onDelete, onImageSubmit }: {
               href={product.aliexpress_url}
               target="_blank"
               rel="noopener noreferrer"
-              style={{
-                flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                fontSize: 12, color: 'var(--text-3)', textDecoration: 'none',
-                padding: '8px 14px', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)',
-              }}
+              className="btn btn-secondary"
+              style={{ flex: 1, justifyContent: 'center', textDecoration: 'none' }}
             >
               <ExternalLink size={12} /> Ver no AliExpress
             </a>
             <button
               onClick={() => { onDelete(product.id); onClose() }}
-              style={{
-                background: 'rgba(248,113,113,0.1)', border: '1px solid rgba(248,113,113,0.3)',
-                borderRadius: 'var(--radius-sm)', cursor: 'pointer',
-                color: '#f87171', padding: '8px 14px',
-                display: 'flex', alignItems: 'center', gap: 6, fontSize: 12,
-              }}
+              className="btn btn-ghost"
+              style={{ color: 'var(--error)', borderColor: 'rgba(248,113,113,0.3)' }}
             >
               <Trash2 size={12} /> Remover
             </button>
@@ -335,6 +328,13 @@ function DetailPanel({ product, onClose, onDelete, onImageSubmit }: {
 
 // ─── PRODUCT CARD ──────────────────────────────────────────────────────────────
 
+function labelBadgeClass(label: string | null) {
+  if (label === 'forte') return 'badge badge-success'
+  if (label === 'medio') return 'badge badge-warning'
+  if (label === 'fraco') return 'badge badge-error'
+  return 'badge badge-neutral'
+}
+
 function ProductCard({ product, onClick }: { product: Product; onClick: () => void }) {
   const [imgErr, setImgErr] = useState(false)
   const mainImg = product.images?.[0]
@@ -343,15 +343,13 @@ function ProductCard({ product, onClick }: { product: Product; onClick: () => vo
   return (
     <div
       onClick={onClick}
+      className="card"
       style={{
-        background: 'var(--surface)',
         border: `1px solid ${product.notreglr_score !== null ? scoreColor(product.notreglr_score) + '40' : 'var(--border)'}`,
-        borderRadius: 'var(--radius)',
-        overflow: 'hidden',
         display: 'flex',
         flexDirection: 'column',
         cursor: 'pointer',
-        transition: 'border-color 0.15s, transform 0.1s',
+        transition: 'border-color 0.15s, transform 0.1s, box-shadow 0.15s',
       }}
       onMouseEnter={e => (e.currentTarget.style.transform = 'translateY(-2px)')}
       onMouseLeave={e => (e.currentTarget.style.transform = 'translateY(0)')}
@@ -387,7 +385,7 @@ function ProductCard({ product, onClick }: { product: Product; onClick: () => vo
           </div>
         )}
 
-        {/* Score */}
+        {/* Score badge */}
         {product.notreglr_score !== null && (
           <div style={{
             position: 'absolute', top: 8, right: 8,
@@ -439,16 +437,9 @@ function ProductCard({ product, onClick }: { product: Product; onClick: () => vo
 
         {/* Label badge */}
         {product.notreglr_label && (
-          <div style={{
-            alignSelf: 'flex-start',
-            background: labelBg(product.notreglr_label),
-            color: scoreColor(product.notreglr_score),
-            fontSize: 9, fontWeight: 700, letterSpacing: 0.8,
-            textTransform: 'uppercase', padding: '2px 6px',
-            borderRadius: 'var(--radius-sm)',
-          }}>
+          <span className={labelBadgeClass(product.notreglr_label)} style={{ alignSelf: 'flex-start' }}>
             {product.notreglr_label}
-          </div>
+          </span>
         )}
       </div>
     </div>
@@ -631,13 +622,13 @@ export function MineracaoClient() {
   }
 
   return (
-    <div style={{ maxWidth: 1200 }}>
+    <div>
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 20, gap: 16 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 28, gap: 16 }}>
         <div>
           <h1 style={{ fontSize: 22, fontWeight: 700, color: 'var(--text)', margin: 0 }}>Mineração</h1>
-          <p style={{ color: 'var(--text-4)', fontSize: 12, marginTop: 4 }}>
-            Análise visual via Claude Vision — {products.length} produto{products.length !== 1 ? 's' : ''}
+          <p style={{ color: 'var(--text-3)', fontSize: 13, marginTop: 2 }}>
+            {products.length} produto{products.length !== 1 ? 's' : ''} · análise visual via Claude Vision
           </p>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -648,7 +639,7 @@ export function MineracaoClient() {
                 background: viewMode === mode ? 'var(--surface-2)' : 'none',
                 border: 'none', cursor: 'pointer',
                 color: viewMode === mode ? 'var(--text)' : 'var(--text-4)',
-                padding: '6px 10px', display: 'flex', alignItems: 'center',
+                padding: '7px 10px', display: 'flex', alignItems: 'center',
               }}>
                 {mode === 'grid' ? <LayoutGrid size={14} /> : <List size={14} />}
               </button>
@@ -657,45 +648,23 @@ export function MineracaoClient() {
 
           {/* Delete buttons */}
           {stats.error > 0 && (
-            <button onClick={handleDeleteErrors} style={{
-              background: 'none', border: '1px solid rgba(248,113,113,0.4)',
-              borderRadius: 'var(--radius-sm)', cursor: 'pointer',
-              color: '#f87171', padding: '7px 10px', fontSize: 12,
-              display: 'flex', alignItems: 'center', gap: 5,
-            }}>
+            <button onClick={handleDeleteErrors} className="btn btn-ghost" style={{ color: 'var(--error)', borderColor: 'rgba(248,113,113,0.3)' }}>
               <Trash2 size={12} /> Limpar erros ({stats.error})
             </button>
           )}
           {products.length > 0 && (
-            <button onClick={handleDeleteAll} style={{
-              background: 'none', border: '1px solid var(--border)',
-              borderRadius: 'var(--radius-sm)', cursor: 'pointer',
-              color: 'var(--text-4)', padding: '7px 10px',
-              display: 'flex', alignItems: 'center',
-            }}>
+            <button onClick={handleDeleteAll} className="btn btn-ghost" title="Remover todos">
               <Trash2 size={14} />
             </button>
           )}
 
-          <button onClick={load} style={{
-            background: 'none', border: '1px solid var(--border)',
-            borderRadius: 'var(--radius-sm)', cursor: 'pointer',
-            color: 'var(--text-3)', padding: '7px 10px',
-            display: 'flex', alignItems: 'center',
-          }}>
+          <button onClick={load} className="btn btn-secondary" title="Recarregar">
             <RefreshCw size={14} />
           </button>
           <button
             onClick={() => !analyzing && setShowInput(true)}
             disabled={analyzing}
-            style={{
-              background: 'var(--brand)', color: 'var(--bg)',
-              border: 'none', borderRadius: 'var(--radius-sm)',
-              padding: '8px 14px', cursor: analyzing ? 'default' : 'pointer',
-              fontWeight: 600, fontSize: 13,
-              display: 'flex', alignItems: 'center', gap: 6,
-              opacity: analyzing ? 0.7 : 1,
-            }}
+            className="btn btn-primary"
           >
             {analyzing && analyzeProgress
               ? <><Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> {analyzeProgress.current}/{analyzeProgress.total}</>
@@ -747,31 +716,36 @@ export function MineracaoClient() {
       {products.length > 0 && (
         <div style={{ display: 'flex', gap: 8, marginBottom: 20, alignItems: 'center', flexWrap: 'wrap' }}>
           {([
-            { key: 'all', label: 'Todos', count: products.length, color: 'var(--text-3)' },
-            { key: 'forte', label: 'Forte', count: stats.forte, color: '#4ade80' },
-            { key: 'medio', label: 'Médio', count: stats.medio, color: '#fbbf24' },
-            { key: 'fraco', label: 'Fraco', count: stats.fraco, color: '#f87171' },
-            { key: 'error', label: 'Erro', count: stats.error, color: 'var(--text-4)' },
-          ] as const).map(({ key, label, count, color }) => (
-            <button
-              key={key}
-              onClick={() => setFilter(key)}
-              style={{
-                background: filter === key ? 'var(--surface-2)' : 'none',
-                border: `1px solid ${filter === key ? color : 'var(--border)'}`,
-                borderRadius: 'var(--radius-sm)',
-                padding: '5px 12px', cursor: 'pointer',
-                color: filter === key ? color : 'var(--text-4)',
-                fontSize: 12, fontWeight: filter === key ? 600 : 400,
-                display: 'flex', alignItems: 'center', gap: 5,
-              }}
-            >
-              {label}
-              <span style={{ background: 'var(--surface-3)', borderRadius: 99, padding: '0 5px', fontSize: 10, color: 'var(--text-4)' }}>
-                {count}
-              </span>
-            </button>
-          ))}
+            { key: 'all', label: 'Todos', count: products.length },
+            { key: 'forte', label: 'Forte', count: stats.forte },
+            { key: 'medio', label: 'Médio', count: stats.medio },
+            { key: 'fraco', label: 'Fraco', count: stats.fraco },
+            { key: 'error', label: 'Erro', count: stats.error },
+          ] as const).map(({ key, label, count }) => {
+            const activeColor = key === 'forte' ? 'var(--success)' : key === 'medio' ? 'var(--warning)' : key === 'fraco' ? 'var(--error)' : key === 'error' ? 'var(--text-4)' : 'var(--brand)'
+            return (
+              <button
+                key={key}
+                onClick={() => setFilter(key)}
+                style={{
+                  background: filter === key ? 'var(--surface-2)' : 'transparent',
+                  border: `1px solid ${filter === key ? activeColor : 'var(--border)'}`,
+                  borderRadius: 'var(--radius-full)',
+                  padding: '4px 12px', cursor: 'pointer',
+                  color: filter === key ? activeColor : 'var(--text-3)',
+                  fontSize: 12, fontWeight: filter === key ? 600 : 400,
+                  display: 'inline-flex', alignItems: 'center', gap: 5,
+                  fontFamily: 'var(--font)',
+                  transition: 'border-color 0.15s, color 0.15s',
+                }}
+              >
+                {label}
+                <span style={{ background: 'var(--surface-3)', borderRadius: 99, padding: '0 5px', fontSize: 10, color: 'var(--text-4)' }}>
+                  {count}
+                </span>
+              </button>
+            )
+          })}
 
           {/* Sort */}
           <div style={{ marginLeft: 'auto', position: 'relative', display: 'flex', alignItems: 'center' }}>
@@ -779,10 +753,11 @@ export function MineracaoClient() {
               value={sort}
               onChange={e => setSort(e.target.value as SortKey)}
               style={{
-                background: 'var(--surface-2)', border: '1px solid var(--border)',
+                background: 'var(--surface-2)', border: '1px solid var(--border-input)',
                 borderRadius: 'var(--radius-sm)', color: 'var(--text-3)',
-                fontSize: 12, padding: '5px 28px 5px 10px',
+                fontSize: 12, padding: '6px 28px 6px 10px',
                 cursor: 'pointer', outline: 'none', appearance: 'none',
+                fontFamily: 'var(--font)',
               }}
             >
               <option value="score">Ordenar: Score</option>
@@ -821,36 +796,20 @@ export function MineracaoClient() {
               placeholder={'https://www.aliexpress.com/item/...\nhttps://www.aliexpress.com/item/...'}
               rows={8}
               autoFocus
-              style={{
-                width: '100%', boxSizing: 'border-box',
-                background: 'var(--surface-2)', border: '1px solid var(--border-input)',
-                borderRadius: 'var(--radius-sm)', color: 'var(--text)', fontSize: 12,
-                padding: '10px 12px', resize: 'vertical',
-                fontFamily: 'var(--font-mono)', outline: 'none',
-              }}
+              className="form-input"
+              style={{ resize: 'vertical', fontFamily: 'var(--font-mono)', fontSize: 12 }}
             />
             <div style={{ display: 'flex', gap: 8, marginTop: 12, justifyContent: 'flex-end' }}>
               <button
                 onClick={() => { setShowInput(false); setInput('') }}
-                style={{
-                  background: 'none', border: '1px solid var(--border)',
-                  borderRadius: 'var(--radius-sm)', padding: '8px 16px',
-                  cursor: 'pointer', color: 'var(--text-3)', fontSize: 13,
-                }}
+                className="btn btn-secondary"
               >
                 Cancelar
               </button>
               <button
                 onClick={handleAnalyze}
                 disabled={!input.trim() || analyzing}
-                style={{
-                  background: 'var(--brand)', color: 'var(--bg)',
-                  border: 'none', borderRadius: 'var(--radius-sm)',
-                  padding: '8px 20px', cursor: 'pointer',
-                  fontWeight: 600, fontSize: 13,
-                  opacity: !input.trim() || analyzing ? 0.5 : 1,
-                  display: 'flex', alignItems: 'center', gap: 6,
-                }}
+                className="btn btn-primary"
               >
                 Analisar {input.trim().split('\n').filter(Boolean).length > 0 && `(${input.trim().split('\n').filter(Boolean).length})`}
               </button>
