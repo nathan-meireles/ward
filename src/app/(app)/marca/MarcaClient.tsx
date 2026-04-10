@@ -1,113 +1,538 @@
 'use client'
 
-// ─── BRAND DOCUMENTATION — NOTREGLR ──────────────────────────────────────────
-// Brandbook completo para colaboradores, sócios e equipe interna.
-// Conteúdo derivado de: brand-vision.md, brand-voice.md, avatar-elena.md,
-// competitors.md, team-structure.md, playbooks/criativos.md
+import { useState, useEffect } from 'react'
+import { ChevronDown, Edit2, Check } from 'lucide-react'
+
+// ─── POSITIONING MAP SVG ──────────────────────────────────────────────────────
+
+const mapBrands = [
+  { name: 'Cult Gaia',         x: 0.72, y: 0.14, tier: 'adjacent',  price: '€200+' },
+  { name: 'Danse Lente',       x: 0.85, y: 0.08, tier: 'adjacent',  price: '€300+' },
+  { name: 'Staud',             x: 0.78, y: 0.22, tier: 'adjacent',  price: '€180+' },
+  { name: 'Elleme',            x: 0.64, y: 0.18, tier: 'adjacent',  price: '€250+' },
+  { name: 'Polène',            x: 0.58, y: 0.24, tier: 'adjacent',  price: '€200+' },
+  { name: 'Zara',              x: 0.22, y: 0.72, tier: 'generic',   price: 'acessível' },
+  { name: 'H&M',               x: 0.18, y: 0.80, tier: 'generic',   price: 'acessível' },
+  { name: 'Vendula',           x: 0.60, y: 0.68, tier: 'direct',    price: '€35-105' },
+  { name: 'HVISK',             x: 0.55, y: 0.60, tier: 'direct',    price: '€50-150' },
+  { name: 'Irregular Choice',  x: 0.50, y: 0.74, tier: 'direct',    price: '€40-175' },
+  { name: 'NOTREGLR',          x: 0.78, y: 0.65, tier: 'notreglr',  price: '€55-80' },
+]
+
+function PositioningMap() {
+  const W = 600
+  const H = 340
+  const cx = 300
+  const cy = 170
+
+  return (
+    <svg
+      viewBox={`0 0 ${W} ${H}`}
+      style={{ width: '100%', height: 'auto', display: 'block' }}
+      aria-label="Mapa de posicionamento competitivo"
+    >
+      {/* quadrant target zone highlight */}
+      <rect x={cx + 20} y={20} width={W - cx - 40} height={cy - 20} fill="rgba(221,209,187,0.04)" rx={2} />
+
+      {/* axis lines */}
+      <line x1={cx} y1={10} x2={cx} y2={H - 10} stroke="rgba(255,255,255,0.1)" strokeWidth={1} />
+      <line x1={10} y1={cy} x2={W - 10} y2={cy} stroke="rgba(255,255,255,0.1)" strokeWidth={1} />
+
+      {/* axis labels */}
+      <text x={16} y={cy - 8} fontFamily="var(--font-mono)" fontSize={9} fill="var(--text-4)" letterSpacing="0.1em">GENÉRICA</text>
+      <text x={W - 14} y={cy - 8} fontFamily="var(--font-mono)" fontSize={9} fill="var(--text-4)" letterSpacing="0.1em" textAnchor="end">DIFERENTE</text>
+      <text x={cx + 8} y={22} fontFamily="var(--font-mono)" fontSize={9} fill="var(--text-4)" letterSpacing="0.1em">CARA €200+</text>
+      <text x={cx + 8} y={H - 12} fontFamily="var(--font-mono)" fontSize={9} fill="var(--text-4)" letterSpacing="0.1em">BARATA &lt;€40</text>
+
+      {/* brand dots */}
+      {mapBrands.map((b) => {
+        const bx = b.x * W
+        const by = b.y * H
+        const isNotreglr = b.tier === 'notreglr'
+        const r = isNotreglr ? 8 : 5
+        const dotFill =
+          b.tier === 'notreglr' ? 'var(--brand)' :
+          b.tier === 'adjacent' ? 'var(--text-4)' :
+          b.tier === 'direct'   ? 'var(--text-3)' :
+          'var(--text-4)'
+        const dotOpacity = b.tier === 'generic' ? 0.6 : 1
+        const labelColor = isNotreglr ? 'var(--brand)' : b.tier === 'adjacent' ? 'var(--text-4)' : 'var(--text-3)'
+        const labelSize = isNotreglr ? 12 : 10
+        const priceSize = isNotreglr ? 10 : 8
+        // label offset: push right for most, left for near-right edge
+        const labelX = bx > W * 0.82 ? bx - 6 : bx + r + 5
+        const labelAnchor = bx > W * 0.82 ? 'end' : 'start'
+
+        return (
+          <g key={b.name} opacity={dotOpacity}>
+            {isNotreglr && (
+              <circle cx={bx} cy={by} r={14} fill="var(--brand)" opacity={0.15} />
+            )}
+            <circle
+              cx={bx}
+              cy={by}
+              r={r}
+              fill={dotFill}
+              style={isNotreglr ? { filter: 'drop-shadow(0 0 6px rgba(221,209,187,0.45))' } : undefined}
+            />
+            {isNotreglr && (
+              <text x={labelX - 14} y={by - r - 4} fontFamily="var(--font-mono)" fontSize={9} fill="var(--brand)" textAnchor="end">←</text>
+            )}
+            <text
+              x={labelX}
+              y={by - 2}
+              fontFamily="var(--font-mono)"
+              fontSize={labelSize}
+              fill={labelColor}
+              textAnchor={labelAnchor}
+            >
+              {b.name}
+            </text>
+            <text
+              x={labelX}
+              y={by + priceSize + 1}
+              fontFamily="var(--font-mono)"
+              fontSize={priceSize}
+              fill={isNotreglr ? 'var(--brand)' : 'var(--text-4)'}
+              textAnchor={labelAnchor}
+              opacity={0.8}
+            >
+              {b.price}
+            </text>
+          </g>
+        )
+      })}
+    </svg>
+  )
+}
+
+// ─── SECTION ACCORDION ───────────────────────────────────────────────────────
+
+function Section({
+  id,
+  num,
+  title,
+  open,
+  onToggle,
+  children,
+}: {
+  id: string
+  num: string
+  title: string
+  open: boolean
+  onToggle: () => void
+  children: React.ReactNode
+}) {
+  return (
+    <section id={id} style={{ marginBottom: 48 }}>
+      {/* header */}
+      <div
+        onClick={onToggle}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 14,
+          padding: '16px 20px',
+          background: 'var(--surface)',
+          border: '1px solid var(--border-2)',
+          borderLeft: open ? '3px solid var(--brand)' : '3px solid transparent',
+          borderRadius: 'var(--radius)',
+          cursor: 'pointer',
+          marginBottom: open ? 20 : 0,
+          userSelect: 'none',
+          transition: 'border-left-color 0.2s, background 0.15s',
+        }}
+        onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.background = 'var(--surface-hover)' }}
+        onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.background = 'var(--surface)' }}
+      >
+        <span style={{
+          fontFamily: 'var(--font-mono)',
+          fontSize: 11,
+          color: 'var(--brand)',
+          minWidth: 22,
+          letterSpacing: '0.1em',
+        }}>
+          {num}
+        </span>
+        <h2 style={{
+          fontFamily: 'var(--font-alt)',
+          fontSize: 20,
+          color: 'var(--text)',
+          fontWeight: 400,
+          margin: 0,
+          flex: 1,
+        }}>
+          {title}
+        </h2>
+        <ChevronDown
+          size={16}
+          color="var(--text-4)"
+          style={{ transition: 'transform 0.3s', transform: open ? 'rotate(180deg)' : 'rotate(0deg)', flexShrink: 0 }}
+        />
+      </div>
+
+      {/* collapsible body */}
+      <div style={{
+        overflow: 'hidden',
+        maxHeight: open ? '9999px' : '0',
+        transition: 'max-height 0.3s ease',
+      }}>
+        {children}
+      </div>
+    </section>
+  )
+}
+
+// ─── EDIT MODE HELPERS ────────────────────────────────────────────────────────
+
+const STORAGE_KEY = 'marca_edits'
+
+function EditableP({
+  editKey,
+  children,
+  editMode,
+  edits,
+  onEdit,
+  style,
+}: {
+  editKey: string
+  children: string
+  editMode: boolean
+  edits: Record<string, string>
+  onEdit: (key: string, value: string) => void
+  style?: React.CSSProperties
+}) {
+  const value = edits[editKey] !== undefined ? edits[editKey] : children
+
+  if (!editMode) {
+    return <p style={style}>{value}</p>
+  }
+
+  return (
+    <div
+      contentEditable
+      suppressContentEditableWarning
+      onBlur={e => onEdit(editKey, e.currentTarget.textContent ?? '')}
+      style={{
+        ...style,
+        outline: '1px dashed var(--brand)',
+        borderRadius: 4,
+        padding: 4,
+        minHeight: 20,
+        cursor: 'text',
+      }}
+    >
+      {value}
+    </div>
+  )
+}
+
+// ─── UTILITY COMPONENTS ───────────────────────────────────────────────────────
+
+function SectionLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <div style={{
+      fontFamily: 'var(--font-mono)',
+      fontSize: 10,
+      letterSpacing: '0.14em',
+      textTransform: 'uppercase',
+      color: 'var(--text-4)',
+      marginBottom: 12,
+    }}>
+      {children}
+    </div>
+  )
+}
+
+function BlockCard({ title, children, style }: { title: string; children: React.ReactNode; style?: React.CSSProperties }) {
+  return (
+    <div style={{
+      background: 'var(--surface)',
+      border: '1px solid var(--border-2)',
+      borderRadius: 'var(--radius)',
+      padding: '20px 24px',
+      marginBottom: 12,
+      ...style,
+    }}>
+      <div style={{
+        fontFamily: 'var(--font-mono)',
+        fontSize: 10,
+        letterSpacing: '0.14em',
+        textTransform: 'uppercase',
+        color: 'var(--text-4)',
+        marginBottom: 14,
+      }}>
+        {title}
+      </div>
+      {children}
+    </div>
+  )
+}
+
+function Quote({ children }: { children: React.ReactNode }) {
+  return (
+    <blockquote style={{
+      fontFamily: 'var(--font)',
+      fontSize: 15,
+      fontStyle: 'italic',
+      color: 'var(--text-2)',
+      lineHeight: 1.7,
+      margin: '0 0 12px',
+      borderLeft: '2px solid var(--brand)',
+      paddingLeft: 16,
+    }}>
+      {children}
+    </blockquote>
+  )
+}
+
+function DataTable({ headers, rows }: { headers: string[]; rows: string[][] }) {
+  return (
+    <div style={{ overflowX: 'auto' }}>
+      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+        <thead>
+          <tr>
+            {headers.map(h => (
+              <th key={h} style={{
+                fontFamily: 'var(--font-mono)',
+                fontSize: 10,
+                letterSpacing: '0.14em',
+                textTransform: 'uppercase',
+                color: 'var(--text-4)',
+                textAlign: 'left',
+                padding: '8px 12px',
+                borderBottom: '1px solid var(--border-2)',
+                whiteSpace: 'nowrap',
+              }}>
+                {h}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row, i) => (
+            <tr key={i} style={{ borderBottom: '1px solid var(--border)' }}>
+              {row.map((cell, j) => (
+                <td key={j} style={{
+                  fontFamily: j === 0 ? 'var(--font-mono)' : 'var(--font)',
+                  fontSize: 13,
+                  color: j === 0 ? 'var(--brand)' : 'var(--text-3)',
+                  padding: '10px 12px',
+                  lineHeight: 1.5,
+                  verticalAlign: 'top',
+                }}>
+                  {cell}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+const bodyStyle: React.CSSProperties = {
+  fontFamily: 'var(--font)',
+  fontSize: 14,
+  color: 'var(--text-3)',
+  lineHeight: 1.65,
+  margin: 0,
+}
+
+const labelStyle: React.CSSProperties = {
+  fontFamily: 'var(--font-mono)',
+  fontSize: 10,
+  letterSpacing: '0.14em',
+  textTransform: 'uppercase' as const,
+  color: 'var(--text-4)',
+}
+
+// ─── MAIN COMPONENT ───────────────────────────────────────────────────────────
+
+const sections = [
+  { num: '01', title: 'Visão, Missão e Valores' },
+  { num: '02', title: 'Posicionamento' },
+  { num: '03', title: 'Filosofia de Comunicação' },
+  { num: '04', title: 'Voz da Marca' },
+  { num: '05', title: 'Avatar: Elena' },
+  { num: '06', title: 'Founder Story' },
+  { num: '07', title: 'Linhas de Produto' },
+  { num: '08', title: 'Análise de Concorrentes' },
+  { num: '09', title: 'Estratégia de Criativos' },
+  { num: '10', title: 'Time e Operação' },
+]
 
 export function MarcaClient() {
+  const [openSections, setOpenSections] = useState<Record<string, boolean>>({
+    '01': true,
+    '02': true,
+    '03': true,
+    '04': true,
+    '05': false,
+    '06': false,
+    '07': false,
+    '08': false,
+    '09': false,
+    '10': false,
+  })
+  const [editMode, setEditMode] = useState(false)
+  const [edits, setEdits] = useState<Record<string, string>>({})
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY)
+      if (stored) setEdits(JSON.parse(stored))
+    } catch {}
+  }, [])
+
+  function handleEdit(key: string, value: string) {
+    const next = { ...edits, [key]: value }
+    setEdits(next)
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(next)) } catch {}
+  }
+
+  function toggleSection(num: string) {
+    setOpenSections(prev => ({ ...prev, [num]: !prev[num] }))
+  }
+
+  function ep(key: string, fallback: string) {
+    return edits[key] !== undefined ? edits[key] : fallback
+  }
+
   return (
     <main style={{ maxWidth: 960, margin: '0 auto', padding: '48px 32px 96px' }}>
 
-      {/* ── HERO ─────────────────────────────────────────────────────────────── */}
-      <section style={{ marginBottom: 64 }}>
-        <div style={{
-          display: 'inline-block',
-          fontFamily: 'var(--font-mono)',
-          fontSize: 11,
-          letterSpacing: '0.16em',
-          textTransform: 'uppercase',
-          color: 'var(--brand)',
-          marginBottom: 16,
-        }}>
-          Brandbook v1.0 — 06/04/2026
+      {/* ── HERO ──────────────────────────────────────────────────────────────── */}
+      <section style={{ marginBottom: 56 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
+          <div style={{ ...labelStyle }}>
+            Brandbook v1.0 — 06/04/2026
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            {editMode && (
+              <span className="badge" style={{ background: 'var(--brand-dim)', color: 'var(--brand)', fontFamily: 'var(--font-mono)', fontSize: 10 }}>
+                Modo Edição
+              </span>
+            )}
+            <button
+              onClick={() => setEditMode(v => !v)}
+              className="btn btn-ghost"
+              style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}
+              title={editMode ? 'Sair do modo edição' : 'Editar conteúdo'}
+            >
+              {editMode ? <Check size={14} /> : <Edit2 size={14} />}
+              {editMode ? 'Concluir' : 'Editar'}
+            </button>
+          </div>
         </div>
+
         <h1 style={{
           fontFamily: 'var(--font-alt)',
-          fontSize: 'clamp(48px, 8vw, 80px)',
+          fontSize: 52,
           lineHeight: 1,
           color: 'var(--text)',
-          marginBottom: 24,
+          marginBottom: 12,
           fontWeight: 400,
         }}>
           NOTREGLR
         </h1>
         <p style={{
           fontFamily: 'var(--font)',
-          fontSize: 20,
+          fontSize: 16,
           color: 'var(--text-3)',
-          maxWidth: 560,
-          lineHeight: 1.6,
           marginBottom: 32,
         }}>
           Not regular. Not for everyone.
         </p>
         <div style={{
           background: 'var(--surface)',
-          border: '1px solid var(--border)',
+          border: '1px solid var(--border-2)',
           borderLeft: '3px solid var(--brand)',
           borderRadius: 'var(--radius)',
           padding: '20px 24px',
           maxWidth: 680,
         }}>
-          <p style={{ fontFamily: 'var(--font)', fontSize: 15, color: 'var(--text-2)', lineHeight: 1.7, margin: 0 }}>
-            "A gente não tenta ser elegante. A gente tenta ser inesquecível. Se é estranho, colorido ou
-            fora da curva — provavelmente é pra gente. Nossas bolsas não foram feitas pra combinar com
-            tudo. Foram feitas pra dizer alguma coisa."
-          </p>
+          {editMode ? (
+            <div
+              contentEditable
+              suppressContentEditableWarning
+              onBlur={e => handleEdit('manifesto', e.currentTarget.textContent ?? '')}
+              style={{
+                fontFamily: 'var(--font)',
+                fontSize: 14,
+                color: 'var(--text-2)',
+                lineHeight: 1.7,
+                margin: 0,
+                outline: '1px dashed var(--brand)',
+                borderRadius: 4,
+                padding: 4,
+                cursor: 'text',
+              }}
+            >
+              {ep('manifesto', 'A gente não tenta ser elegante. A gente tenta ser inesquecível. Se é estranho, colorido ou fora da curva — provavelmente é pra gente. Nossas bolsas não foram feitas pra combinar com tudo. Foram feitas pra dizer alguma coisa.')}
+            </div>
+          ) : (
+            <p style={{ fontFamily: 'var(--font)', fontSize: 14, color: 'var(--text-2)', lineHeight: 1.7, margin: 0 }}>
+              {ep('manifesto', 'A gente não tenta ser elegante. A gente tenta ser inesquecível. Se é estranho, colorido ou fora da curva — provavelmente é pra gente. Nossas bolsas não foram feitas pra combinar com tudo. Foram feitas pra dizer alguma coisa.')}
+            </p>
+          )}
         </div>
       </section>
 
       {/* ── ÍNDICE ────────────────────────────────────────────────────────────── */}
-      <nav style={{ marginBottom: 64 }}>
+      <nav style={{ marginBottom: 56 }}>
         <SectionLabel>Índice</SectionLabel>
-        <div className="bento" style={{ gridTemplateColumns: 'repeat(2, 1fr)', borderRadius: 'var(--radius)' }}>
-          {[
-            ['01', 'Visão, Missão e Valores'],
-            ['02', 'Posicionamento'],
-            ['03', 'Filosofia de Comunicação'],
-            ['04', 'Voz da Marca'],
-            ['05', 'Avatar: Elena'],
-            ['06', 'Founder Story'],
-            ['07', 'Linhas de Produto'],
-            ['08', 'Concorrentes'],
-            ['09', 'Estratégia de Criativos'],
-            ['10', 'Time e Operação'],
-          ].map(([num, label]) => (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+          {sections.map(({ num, title }) => (
             <a
               key={num}
               href={`#s${num}`}
+              onClick={e => {
+                e.preventDefault()
+                setOpenSections(prev => ({ ...prev, [num]: true }))
+                setTimeout(() => {
+                  document.getElementById(`s${num}`)?.scrollIntoView({ behavior: 'smooth' })
+                }, 50)
+              }}
               style={{
-                display: 'flex',
+                display: 'inline-flex',
                 alignItems: 'center',
-                gap: 12,
-                padding: '14px 18px',
-                textDecoration: 'none',
+                gap: 7,
+                padding: '7px 12px',
                 background: 'var(--surface)',
+                border: '1px solid var(--border-2)',
+                borderRadius: 'var(--radius-sm)',
+                textDecoration: 'none',
                 transition: 'background 0.15s',
               }}
+              onMouseEnter={e => { (e.currentTarget as HTMLAnchorElement).style.background = 'var(--surface-hover)' }}
+              onMouseLeave={e => { (e.currentTarget as HTMLAnchorElement).style.background = 'var(--surface)' }}
             >
-              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--brand)', minWidth: 22 }}>{num}</span>
-              <span style={{ fontFamily: 'var(--font)', fontSize: 14, color: 'var(--text-3)' }}>{label}</span>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--brand)' }}>{num}</span>
+              <span style={{ fontFamily: 'var(--font)', fontSize: 13, color: 'var(--text-3)' }}>{title}</span>
             </a>
           ))}
         </div>
       </nav>
 
       {/* ── 01 VISÃO, MISSÃO E VALORES ────────────────────────────────────────── */}
-      <section id="s01" style={{ marginBottom: 72 }}>
-        <SectionHeader num="01" title="Visão, Missão e Valores" />
+      <Section id="s01" num="01" title="Visão, Missão e Valores" open={openSections['01']} onToggle={() => toggleSection('01')}>
 
         <BlockCard title="Visão">
           <Quote>
             Ser a marca de referência europeia para mulheres que recusam o uniforme da moda em
             massa — provando que design impossível de ignorar não precisa custar €300.
           </Quote>
-          <p style={bodyStyle}>
-            Em termos práticos: uma mulher em Amsterdam, Berlim ou Paris que quer uma peça
-            verdadeiramente diferente sabe que existe um lugar onde alguém já fez a curadoria por ela.
-            Esse lugar é a NOTREGLR.
-          </p>
+          <EditableP
+            editKey="s01-visao"
+            editMode={editMode}
+            edits={edits}
+            onEdit={handleEdit}
+            style={bodyStyle}
+          >
+            Em termos práticos: uma mulher em Amsterdam, Berlim ou Paris que quer uma peça verdadeiramente diferente sabe que existe um lugar onde alguém já fez a curadoria por ela. Esse lugar é a NOTREGLR.
+          </EditableP>
         </BlockCard>
 
         <BlockCard title="Missão">
@@ -163,41 +588,29 @@ export function MarcaClient() {
             ))}
           </div>
         </BlockCard>
-      </section>
+      </Section>
 
       {/* ── 02 POSICIONAMENTO ─────────────────────────────────────────────────── */}
-      <section id="s02" style={{ marginBottom: 72 }}>
-        <SectionHeader num="02" title="Posicionamento" />
+      <Section id="s02" num="02" title="Posicionamento" open={openSections['02']} onToggle={() => toggleSection('02')}>
 
         <BlockCard title="Mapa de Posicionamento">
           <div style={{
-            fontFamily: 'var(--font-mono)',
-            fontSize: 12,
-            color: 'var(--text-3)',
-            lineHeight: 1.8,
             background: 'var(--surface-2)',
             borderRadius: 'var(--radius-sm)',
             padding: '20px 24px',
-            overflowX: 'auto',
-            whiteSpace: 'pre',
+            marginBottom: 16,
           }}>
-{`         CARA (€200+)
-              │
-  Cult Gaia   │   Danse Lente
-  Staud        │   Elleme
-              │
-GENÉRICA ─────┼───────── DIFERENTE
-              │
-  Zara        │   ← NOTREGLR ←
-  H&M         │   (€55-80, design impossível
-              │    de ignorar, DTC, Europa)
-              │
-         BARATA (<€40)`}
+            <PositioningMap />
           </div>
-          <p style={{ ...bodyStyle, marginTop: 16 }}>
-            A NOTREGLR ocupa o quadrante que não existe: <strong style={{ color: 'var(--brand)' }}>diferente + acessível</strong>.
-            As marcas com design forte custam €200+. As acessíveis são genéricas. O gap é real.
-          </p>
+          <EditableP
+            editKey="s02-gap"
+            editMode={editMode}
+            edits={edits}
+            onEdit={handleEdit}
+            style={{ ...bodyStyle, marginTop: 16 }}
+          >
+            A NOTREGLR ocupa o quadrante que não existe: diferente + acessível. As marcas com design forte custam €200+. As acessíveis são genéricas. O gap é real.
+          </EditableP>
         </BlockCard>
 
         <div className="bento" style={{ gridTemplateColumns: 'repeat(3, 1fr)', borderRadius: 'var(--radius)', marginTop: 16 }}>
@@ -210,25 +623,30 @@ GENÉRICA ─────┼───────── DIFERENTE
             { label: 'Idioma', value: 'Inglês', sub: 'Loja multi-país' },
           ].map(({ label, value, sub }) => (
             <div key={label} style={{ padding: '20px 20px', background: 'var(--surface)' }}>
-              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--text-4)', marginBottom: 8 }}>{label}</div>
+              <div style={{ ...labelStyle, marginBottom: 8 }}>{label}</div>
               <div style={{ fontFamily: 'var(--font-alt)', fontSize: 20, color: 'var(--text)', marginBottom: 4 }}>{value}</div>
               <div style={{ fontFamily: 'var(--font)', fontSize: 12, color: 'var(--text-4)' }}>{sub}</div>
             </div>
           ))}
         </div>
-      </section>
+      </Section>
 
       {/* ── 03 FILOSOFIA DE COMUNICAÇÃO ───────────────────────────────────────── */}
-      <section id="s03" style={{ marginBottom: 72 }}>
-        <SectionHeader num="03" title="Filosofia de Comunicação" />
+      <Section id="s03" num="03" title="Filosofia de Comunicação" open={openSections['03']} onToggle={() => toggleSection('03')}>
 
         <BlockCard title="Premissas Irrefutáveis — Light Copy">
-          <p style={bodyStyle}>
+          <EditableP
+            editKey="s03-intro"
+            editMode={editMode}
+            edits={edits}
+            onEdit={handleEdit}
+            style={bodyStyle}
+          >
             Há dois tipos de marketing. A NOTREGLR pratica apenas um deles.
-          </p>
+          </EditableP>
           <div className="bento" style={{ gridTemplateColumns: '1fr 1fr', borderRadius: 'var(--radius-sm)', marginTop: 16 }}>
             <div style={{ padding: '20px 20px', background: 'var(--surface-2)' }}>
-              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--text-4)', marginBottom: 12 }}>Marketing de Promessas ✕</div>
+              <div style={{ ...labelStyle, marginBottom: 12 }}>Marketing de Promessas ✕</div>
               {[
                 '"Esta bolsa vai fazer você se destacar."',
                 '"Qualidade premium por um preço acessível."',
@@ -241,7 +659,7 @@ GENÉRICA ─────┼───────── DIFERENTE
               </p>
             </div>
             <div style={{ padding: '20px 20px', background: 'var(--surface-2)' }}>
-              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--brand)', marginBottom: 12 }}>Marketing de Premissas ✓</div>
+              <div style={{ ...labelStyle, color: 'var(--brand)', marginBottom: 12 }}>Marketing de Premissas ✓</div>
               {[
                 '"Este é o único formato de bolsa que ninguém na Europa está carregando nessa faixa de preço."',
                 '"Compramos pequenos lotes. Quando esgota, não reabastecemos."',
@@ -257,7 +675,15 @@ GENÉRICA ─────┼───────── DIFERENTE
         </BlockCard>
 
         <BlockCard title="Remodelagem de Copy Clássico">
-          <p style={bodyStyle}>Os elementos clássicos de copy não são descartados — são remodelados para o ângulo verdadeiro da marca.</p>
+          <EditableP
+            editKey="s03-remodel"
+            editMode={editMode}
+            edits={edits}
+            onEdit={handleEdit}
+            style={{ ...bodyStyle, marginBottom: 12 }}
+          >
+            Os elementos clássicos de copy não são descartados — são remodelados para o ângulo verdadeiro da marca.
+          </EditableP>
           <DataTable
             headers={['Elemento', 'Hard Copy tradicional', 'NOTREGLR — versão verdadeira']}
             rows={[
@@ -277,11 +703,10 @@ GENÉRICA ─────┼───────── DIFERENTE
             A premissa tem que ser verdadeira. A remodelagem nunca inventa — ela enquadra o que é real pelo ângulo mais vantajoso e honesto.
           </Quote>
         </BlockCard>
-      </section>
+      </Section>
 
       {/* ── 04 VOZ DA MARCA ───────────────────────────────────────────────────── */}
-      <section id="s04" style={{ marginBottom: 72 }}>
-        <SectionHeader num="04" title="Voz da Marca" />
+      <Section id="s04" num="04" title="Voz da Marca" open={openSections['04']} onToggle={() => toggleSection('04')}>
 
         <BlockCard title="Tom em uma frase">
           <div style={{
@@ -329,9 +754,15 @@ GENÉRICA ─────┼───────── DIFERENTE
         </BlockCard>
 
         <BlockCard title="Linhas Fundadoras">
-          <p style={{ ...bodyStyle, marginBottom: 16 }}>
+          <EditableP
+            editKey="s04-linhas-intro"
+            editMode={editMode}
+            edits={edits}
+            onEdit={handleEdit}
+            style={{ ...bodyStyle, marginBottom: 16 }}
+          >
             Estas linhas são o coração que bate na NOTREGLR. Não são campanhas — são a linguagem permanente da marca.
-          </p>
+          </EditableP>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             {[
               'Not regular. Not for everyone.',
@@ -361,7 +792,7 @@ GENÉRICA ─────┼───────── DIFERENTE
           </p>
         </BlockCard>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1, background: 'var(--border)', borderRadius: 'var(--radius)', overflow: 'hidden', marginTop: 16 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1, background: 'var(--border-2)', borderRadius: 'var(--radius)', overflow: 'hidden', marginTop: 16 }}>
           <div style={{ background: 'var(--surface)', padding: '24px 24px' }}>
             <SectionLabel>Vocabulário — Usar</SectionLabel>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -417,15 +848,14 @@ GENÉRICA ─────┼───────── DIFERENTE
             ]}
           />
         </BlockCard>
-      </section>
+      </Section>
 
       {/* ── 05 AVATAR ELENA ───────────────────────────────────────────────────── */}
-      <section id="s05" style={{ marginBottom: 72 }}>
-        <SectionHeader num="05" title="Avatar: Elena" />
+      <Section id="s05" num="05" title="Avatar: Elena" open={openSections['05']} onToggle={() => toggleSection('05')}>
 
         <div style={{
           background: 'var(--surface)',
-          border: '1px solid var(--border)',
+          border: '1px solid var(--border-2)',
           borderRadius: 'var(--radius)',
           padding: '20px 24px',
           marginBottom: 16,
@@ -449,7 +879,7 @@ GENÉRICA ─────┼───────── DIFERENTE
             { label: 'Idioma', value: 'Multilíngue', sub: 'inglês fluente como segunda língua' },
           ].map(({ label, value, sub }) => (
             <div key={label} style={{ padding: '18px 20px', background: 'var(--surface)' }}>
-              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--text-4)', marginBottom: 8 }}>{label}</div>
+              <div style={{ ...labelStyle, marginBottom: 8 }}>{label}</div>
               <div style={{ fontFamily: 'var(--font)', fontWeight: 600, fontSize: 15, color: 'var(--text)', marginBottom: 4 }}>{value}</div>
               <div style={{ fontFamily: 'var(--font)', fontSize: 12, color: 'var(--text-4)' }}>{sub}</div>
             </div>
@@ -460,7 +890,15 @@ GENÉRICA ─────┼───────── DIFERENTE
           <Quote>
             "Todo mundo no metrô parece igual. Eu compro em lojas diferentes, mas na prática estou comprando o mesmo guarda-roupa que todas as outras."
           </Quote>
-          <p style={bodyStyle}>Ela não está procurando uma bolsa. Está procurando uma peça que faz alguém parar e perguntar. Não por ser cara. Por ser impossível de ignorar.</p>
+          <EditableP
+            editKey="s05-dor"
+            editMode={editMode}
+            edits={edits}
+            onEdit={handleEdit}
+            style={bodyStyle}
+          >
+            Ela não está procurando uma bolsa. Está procurando uma peça que faz alguém parar e perguntar. Não por ser cara. Por ser impossível de ignorar.
+          </EditableP>
         </BlockCard>
 
         <BlockCard title="Gatilhos de Compra">
@@ -504,11 +942,10 @@ GENÉRICA ─────┼───────── DIFERENTE
             O teste de ads vai revelar: faixa etária que mais converte (Meta Analytics), copy que mais ressoa (A/B de ângulos), preço que converte (bundle e AOV).
           </p>
         </BlockCard>
-      </section>
+      </Section>
 
       {/* ── 06 FOUNDER STORY ──────────────────────────────────────────────────── */}
-      <section id="s06" style={{ marginBottom: 72 }}>
-        <SectionHeader num="06" title="Founder Story" />
+      <Section id="s06" num="06" title="Founder Story" open={openSections['06']} onToggle={() => toggleSection('06')}>
 
         <div className="bento" style={{ gridTemplateColumns: '1fr 1fr', borderRadius: 'var(--radius)', marginBottom: 16 }}>
           <div style={{ padding: '24px 24px', background: 'var(--surface)' }}>
@@ -567,74 +1004,30 @@ GENÉRICA ─────┼───────── DIFERENTE
             </div>
           ))}
         </BlockCard>
-      </section>
+      </Section>
 
       {/* ── 07 LINHAS DE PRODUTO ──────────────────────────────────────────────── */}
-      <section id="s07" style={{ marginBottom: 72 }}>
-        <SectionHeader num="07" title="Linhas de Produto" />
+      <Section id="s07" num="07" title="Linhas de Produto" open={openSections['07']} onToggle={() => toggleSection('07')}>
 
-        <p style={{ ...bodyStyle, marginBottom: 24 }}>
-          46 SKUs minerados, organizados em 7 categorias. Filtro de curadoria: <strong style={{ color: 'var(--brand)' }}>"Essa bolsa faria alguém parar o scroll e pensar 'que porra é essa'?"</strong>
-        </p>
+        <EditableP
+          editKey="s07-intro"
+          editMode={editMode}
+          edits={edits}
+          onEdit={handleEdit}
+          style={{ ...bodyStyle, marginBottom: 24 }}
+        >
+          46 SKUs minerados, organizados em 7 categorias. Filtro de curadoria: "Essa bolsa faria alguém parar o scroll e pensar 'que porra é essa'?"
+        </EditableP>
 
         <div className="bento" style={{ borderRadius: 'var(--radius)' }}>
           {[
-            {
-              num: 'L1',
-              title: 'Shape Diferente',
-              qty: '14 modelos',
-              priority: 'PRIORIDADE MÁXIMA',
-              desc: 'Bolsas geométricas, crescent bags, loop handle, metal handle, abstract shapes. Mais alinhada com o conceito da marca.',
-              badge: 'success',
-            },
-            {
-              num: 'L2',
-              title: 'Furry / Textura',
-              qty: '4 modelos',
-              priority: 'Alta',
-              desc: 'Material peludo ou textura diferenciada. Stop-the-scroll alto.',
-              badge: 'success',
-            },
-            {
-              num: 'L3',
-              title: 'Colorida Agressiva',
-              qty: '7 modelos',
-              priority: 'Alta',
-              desc: 'Gradients, color blocks, múltiplas cores saturadas. DNA visual da marca.',
-              badge: 'success',
-            },
-            {
-              num: 'L4',
-              title: 'Floral',
-              qty: '8 modelos',
-              priority: 'Média',
-              desc: 'Padrões florais, jacquard, tapestry. Depende de execução visual.',
-              badge: 'warning',
-            },
-            {
-              num: 'L5',
-              title: 'Floral com Bordado',
-              qty: '1 modelo',
-              priority: 'Média',
-              desc: 'Bordados especiais. Aval visual necessário.',
-              badge: 'warning',
-            },
-            {
-              num: 'L6',
-              title: 'Marinha / Shell',
-              qty: '6 modelos',
-              priority: 'Média',
-              desc: 'Shell bags, iridescent. Formatação diferente, mas depende de tendência.',
-              badge: 'warning',
-            },
-            {
-              num: 'L7',
-              title: 'Rhinestone / Beaded',
-              qty: '6 modelos',
-              priority: 'Alta',
-              desc: 'Rhinestone shoulder bags, beaded bags. Altíssima atenção visual.',
-              badge: 'success',
-            },
+            { num: 'L1', title: 'Shape Diferente',      qty: '14 modelos', priority: 'PRIORIDADE MÁXIMA', desc: 'Bolsas geométricas, crescent bags, loop handle, metal handle, abstract shapes. Mais alinhada com o conceito da marca.', badge: 'success' },
+            { num: 'L2', title: 'Furry / Textura',       qty: '4 modelos',  priority: 'Alta',              desc: 'Material peludo ou textura diferenciada. Stop-the-scroll alto.', badge: 'success' },
+            { num: 'L3', title: 'Colorida Agressiva',    qty: '7 modelos',  priority: 'Alta',              desc: 'Gradients, color blocks, múltiplas cores saturadas. DNA visual da marca.', badge: 'success' },
+            { num: 'L4', title: 'Floral',                qty: '8 modelos',  priority: 'Média',             desc: 'Padrões florais, jacquard, tapestry. Depende de execução visual.', badge: 'warning' },
+            { num: 'L5', title: 'Floral com Bordado',    qty: '1 modelo',   priority: 'Média',             desc: 'Bordados especiais. Aval visual necessário.', badge: 'warning' },
+            { num: 'L6', title: 'Marinha / Shell',       qty: '6 modelos',  priority: 'Média',             desc: 'Shell bags, iridescent. Formatação diferente, mas depende de tendência.', badge: 'warning' },
+            { num: 'L7', title: 'Rhinestone / Beaded',   qty: '6 modelos',  priority: 'Alta',              desc: 'Rhinestone shoulder bags, beaded bags. Altíssima atenção visual.', badge: 'success' },
           ].map(({ num, title, qty, priority, desc, badge }) => (
             <div key={num} style={{ padding: '20px 20px', background: 'var(--surface)', display: 'flex', gap: 16 }}>
               <div style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--brand)', minWidth: 28, paddingTop: 2 }}>{num}</div>
@@ -650,7 +1043,7 @@ GENÉRICA ─────┼───────── DIFERENTE
           ))}
         </div>
 
-        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '16px 20px', marginTop: 16 }}>
+        <div style={{ background: 'var(--surface)', border: '1px solid var(--border-2)', borderRadius: 'var(--radius)', padding: '16px 20px', marginTop: 16 }}>
           <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
             <span className="badge badge-error" style={{ flexShrink: 0 }}>Atenção</span>
             <p style={{ fontFamily: 'var(--font)', fontSize: 13, color: 'var(--text-3)', lineHeight: 1.6, margin: 0 }}>
@@ -658,11 +1051,10 @@ GENÉRICA ─────┼───────── DIFERENTE
             </p>
           </div>
         </div>
-      </section>
+      </Section>
 
       {/* ── 08 CONCORRENTES ───────────────────────────────────────────────────── */}
-      <section id="s08" style={{ marginBottom: 72 }}>
-        <SectionHeader num="08" title="Análise de Concorrentes" />
+      <Section id="s08" num="08" title="Análise de Concorrentes" open={openSections['08']} onToggle={() => toggleSection('08')}>
 
         <BlockCard title="Gap de Mercado">
           <Quote>
@@ -682,7 +1074,7 @@ GENÉRICA ─────┼───────── DIFERENTE
           ]}
         />
 
-        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '16px 20px', marginTop: 16 }}>
+        <div style={{ background: 'var(--surface)', border: '1px solid var(--border-2)', borderRadius: 'var(--radius)', padding: '16px 20px', marginTop: 16 }}>
           <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
             <span className="badge badge-error" style={{ flexShrink: 0 }}>Ponto Cego Crítico</span>
             <p style={{ fontFamily: 'var(--font)', fontSize: 13, color: 'var(--text-3)', lineHeight: 1.6, margin: 0 }}>
@@ -690,14 +1082,21 @@ GENÉRICA ─────┼───────── DIFERENTE
             </p>
           </div>
         </div>
-      </section>
+      </Section>
 
       {/* ── 09 ESTRATÉGIA DE CRIATIVOS ────────────────────────────────────────── */}
-      <section id="s09" style={{ marginBottom: 72 }}>
-        <SectionHeader num="09" title="Estratégia de Criativos" />
+      <Section id="s09" num="09" title="Estratégia de Criativos" open={openSections['09']} onToggle={() => toggleSection('09')}>
 
         <BlockCard title="Filtro Zero">
-          <p style={bodyStyle}>Antes de iniciar qualquer criativo, responder:</p>
+          <EditableP
+            editKey="s09-filtro"
+            editMode={editMode}
+            edits={edits}
+            onEdit={handleEdit}
+            style={{ ...bodyStyle, marginBottom: 12 }}
+          >
+            Antes de iniciar qualquer criativo, responder:
+          </EditableP>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12 }}>
             {[
               '"Esse criativo está alinhado com Not regular. Not for everyone.?"',
@@ -755,17 +1154,16 @@ GENÉRICA ─────┼───────── DIFERENTE
             ))}
           </div>
         </BlockCard>
-      </section>
+      </Section>
 
       {/* ── 10 TIME E OPERAÇÃO ────────────────────────────────────────────────── */}
-      <section id="s10" style={{ marginBottom: 72 }}>
-        <SectionHeader num="10" title="Time e Operação" />
+      <Section id="s10" num="10" title="Time e Operação" open={openSections['10']} onToggle={() => toggleSection('10')}>
 
         <div className="bento" style={{ borderRadius: 'var(--radius)', marginBottom: 16 }}>
           {[
-            { name: 'Nathan', role: 'Fundador / Operador-geral', status: 'Ativo', desc: 'Estratégia, tráfego pago, produto, loja, copy, tech.' },
-            { name: 'Stef Meireles', role: 'Co-fundadora / Rosto da Marca', status: 'Ativa', desc: 'Validação visual, shoot fotográfico, curadoria de produto, identidade da marca.' },
-            { name: 'Hyann', role: 'Criativo / Edição / Mídia', status: 'Off — entrada prevista', desc: 'Execução de criativos, edição de imagem/vídeo, assets de marca.' },
+            { name: 'Nathan',        role: 'Fundador / Operador-geral',       status: 'Ativo',              desc: 'Estratégia, tráfego pago, produto, loja, copy, tech.' },
+            { name: 'Stef Meireles', role: 'Co-fundadora / Rosto da Marca',   status: 'Ativa',              desc: 'Validação visual, shoot fotográfico, curadoria de produto, identidade da marca.' },
+            { name: 'Hyann',         role: 'Criativo / Edição / Mídia',       status: 'Off — entrada prevista', desc: 'Execução de criativos, edição de imagem/vídeo, assets de marca.' },
           ].map(({ name, role, status, desc }) => (
             <div key={name} style={{ padding: '20px 20px', background: 'var(--surface)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
@@ -791,7 +1189,7 @@ GENÉRICA ─────┼───────── DIFERENTE
             ]}
           />
         </BlockCard>
-      </section>
+      </Section>
 
       {/* ── FOOTER ────────────────────────────────────────────────────────────── */}
       <div style={{
@@ -815,137 +1213,4 @@ GENÉRICA ─────┼───────── DIFERENTE
 
     </main>
   )
-}
-
-// ─── UTILITY COMPONENTS ───────────────────────────────────────────────────────
-
-function SectionLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <div style={{
-      fontFamily: 'var(--font-mono)',
-      fontSize: 10,
-      letterSpacing: '0.16em',
-      textTransform: 'uppercase',
-      color: 'var(--text-4)',
-      marginBottom: 12,
-    }}>
-      {children}
-    </div>
-  )
-}
-
-function SectionHeader({ num, title }: { num: string; title: string }) {
-  return (
-    <div style={{ marginBottom: 24 }}>
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 14, marginBottom: 4 }}>
-        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--brand)' }}>{num}</span>
-        <h2 style={{
-          fontFamily: 'var(--font-alt)',
-          fontSize: 28,
-          color: 'var(--text)',
-          fontWeight: 400,
-          margin: 0,
-        }}>
-          {title}
-        </h2>
-      </div>
-      <div style={{ height: 1, background: 'var(--border)' }} />
-    </div>
-  )
-}
-
-function BlockCard({ title, children, style }: { title: string; children: React.ReactNode; style?: React.CSSProperties }) {
-  return (
-    <div style={{
-      background: 'var(--surface)',
-      border: '1px solid var(--border)',
-      borderRadius: 'var(--radius)',
-      padding: '20px 24px',
-      marginBottom: 12,
-      ...style,
-    }}>
-      <div style={{
-        fontFamily: 'var(--font-mono)',
-        fontSize: 10,
-        letterSpacing: '0.14em',
-        textTransform: 'uppercase',
-        color: 'var(--text-4)',
-        marginBottom: 14,
-      }}>
-        {title}
-      </div>
-      {children}
-    </div>
-  )
-}
-
-function Quote({ children }: { children: React.ReactNode }) {
-  return (
-    <blockquote style={{
-      fontFamily: 'var(--font)',
-      fontSize: 16,
-      fontStyle: 'italic',
-      color: 'var(--text-2)',
-      lineHeight: 1.7,
-      margin: '0 0 12px',
-      borderLeft: '2px solid var(--brand)',
-      paddingLeft: 16,
-    }}>
-      {children}
-    </blockquote>
-  )
-}
-
-function DataTable({ headers, rows }: { headers: string[]; rows: string[][] }) {
-  return (
-    <div style={{ overflowX: 'auto' }}>
-      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-        <thead>
-          <tr>
-            {headers.map(h => (
-              <th key={h} style={{
-                fontFamily: 'var(--font-mono)',
-                fontSize: 10,
-                letterSpacing: '0.14em',
-                textTransform: 'uppercase',
-                color: 'var(--text-4)',
-                textAlign: 'left',
-                padding: '8px 12px',
-                borderBottom: '1px solid var(--border)',
-                whiteSpace: 'nowrap',
-              }}>
-                {h}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row, i) => (
-            <tr key={i} style={{ borderBottom: '1px solid var(--border)' }}>
-              {row.map((cell, j) => (
-                <td key={j} style={{
-                  fontFamily: j === 0 ? 'var(--font-mono)' : 'var(--font)',
-                  fontSize: j === 0 ? 12 : 13,
-                  color: j === 0 ? 'var(--brand)' : 'var(--text-3)',
-                  padding: '10px 12px',
-                  lineHeight: 1.5,
-                  verticalAlign: 'top',
-                }}>
-                  {cell}
-                </td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  )
-}
-
-const bodyStyle: React.CSSProperties = {
-  fontFamily: 'var(--font)',
-  fontSize: 14,
-  color: 'var(--text-3)',
-  lineHeight: 1.7,
-  margin: 0,
 }
