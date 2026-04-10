@@ -79,7 +79,7 @@ export default function CriativosPage() {
             { n: '04', title: 'Social proof', desc: 'Dados reais do fornecedor: "4.000+ pedidos neste modelo"', diag: 'Usar só depois dos 3 anteriores testados' },
           ].map(a => (
             <div key={a.n} style={{ background: 'var(--surface-2)', borderRadius: 'var(--radius-sm)', padding: '14px 16px' }}>
-              <div style={{ display: 'flex', align: 'center', gap: 10, marginBottom: 8 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
                 <span style={{ fontFamily: 'var(--font-mono)', fontSize: 20, color: 'var(--brand)', fontWeight: 700 }}>{a.n}</span>
                 <span style={{ fontWeight: 600, color: 'var(--text)', fontSize: 13, alignSelf: 'center' }}>{a.title}</span>
               </div>
