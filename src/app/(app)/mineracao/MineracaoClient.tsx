@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
-import { Search, Trash2, ExternalLink, Loader2, Plus, RefreshCw } from 'lucide-react'
+import { Search, Trash2, ExternalLink, Loader2, Plus, RefreshCw, ImagePlus } from 'lucide-react'
 
 interface Product {
   id: string
@@ -61,10 +61,31 @@ function StatusBadge({ status }: { status: string }) {
   )
 }
 
-function ProductCard({ product, onDelete }: { product: Product; onDelete: (id: string) => void }) {
+function ProductCard({ product, onDelete, onReanalyze }: {
+  product: Product
+  onDelete: (id: string) => void
+  onReanalyze: (id: string) => void
+}) {
   const [imgError, setImgError] = useState(false)
+  const [imgInput, setImgInput] = useState('')
+  const [showImgInput, setShowImgInput] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
   const mainImg = product.images?.[0]
   const isAnalyzing = product.status === 'analyzing'
+
+  async function handleImageSubmit() {
+    if (!imgInput.trim()) return
+    setSubmitting(true)
+    await fetch('/api/mineracao/analyze-image', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: product.id, imageUrl: imgInput.trim() }),
+    })
+    setShowImgInput(false)
+    setImgInput('')
+    setSubmitting(false)
+    onReanalyze(product.id)
+  }
 
   return (
     <div style={{
@@ -167,6 +188,36 @@ function ProductCard({ product, onDelete }: { product: Product; onDelete: (id: s
           <p style={{ fontSize: 11, color: '#f87171', margin: 0 }}>{product.error_msg}</p>
         )}
 
+        {/* Input de imagem manual */}
+        {showImgInput && (
+          <div style={{ display: 'flex', gap: 4 }}>
+            <input
+              autoFocus
+              value={imgInput}
+              onChange={e => setImgInput(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleImageSubmit()}
+              placeholder="Cole a URL da imagem"
+              style={{
+                flex: 1, fontSize: 11, padding: '4px 8px',
+                background: 'var(--surface-2)', border: '1px solid var(--border-input)',
+                borderRadius: 'var(--radius-sm)', color: 'var(--text)', outline: 'none',
+              }}
+            />
+            <button
+              onClick={handleImageSubmit}
+              disabled={submitting || !imgInput.trim()}
+              style={{
+                background: 'var(--brand)', color: 'var(--bg)', border: 'none',
+                borderRadius: 'var(--radius-sm)', cursor: 'pointer',
+                padding: '4px 8px', fontSize: 11, fontWeight: 600,
+                opacity: submitting || !imgInput.trim() ? 0.5 : 1,
+              }}
+            >
+              {submitting ? <Loader2 size={10} style={{ animation: 'spin 1s linear infinite' }} /> : 'OK'}
+            </button>
+          </div>
+        )}
+
         {/* Actions */}
         <div style={{ display: 'flex', gap: 6, marginTop: 'auto', paddingTop: 4 }}>
           <a
@@ -183,6 +234,20 @@ function ProductCard({ product, onDelete }: { product: Product; onDelete: (id: s
           >
             <ExternalLink size={10} /> AliExpress
           </a>
+          {(product.status === 'error' || !product.notreglr_score) && (
+            <button
+              onClick={() => setShowImgInput(v => !v)}
+              title="Adicionar imagem para analisar"
+              style={{
+                background: 'none', border: '1px solid var(--border)',
+                borderRadius: 'var(--radius-sm)', cursor: 'pointer',
+                color: showImgInput ? 'var(--brand)' : 'var(--text-4)',
+                padding: '4px 8px', display: 'flex', alignItems: 'center',
+              }}
+            >
+              <ImagePlus size={12} />
+            </button>
+          )}
           <button
             onClick={() => onDelete(product.id)}
             style={{
@@ -487,7 +552,7 @@ export function MineracaoClient() {
           gap: 16,
         }}>
           {filtered.map(p => (
-            <ProductCard key={p.id} product={p} onDelete={handleDelete} />
+            <ProductCard key={p.id} product={p} onDelete={handleDelete} onReanalyze={load} />
           ))}
         </div>
       )}
