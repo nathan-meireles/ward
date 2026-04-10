@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
-import { Trash2, ExternalLink, Loader2, Plus, RefreshCw, ImagePlus, X, ChevronDown } from 'lucide-react'
+import { Trash2, ExternalLink, Loader2, Plus, RefreshCw, ImagePlus, X, ChevronDown, LayoutGrid, List } from 'lucide-react'
 
 interface Product {
   id: string
@@ -394,6 +394,7 @@ export function MineracaoClient() {
   const [filter, setFilter] = useState<FilterKey>('all')
   const [sort, setSort] = useState<SortKey>('score')
   const [selected, setSelected] = useState<Product | null>(null)
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
 
   const load = useCallback(async () => {
     const res = await fetch('/api/mineracao')
@@ -458,6 +459,31 @@ export function MineracaoClient() {
     setProducts(prev => prev.filter(p => p.id !== id))
   }
 
+  async function handleDeleteErrors() {
+    const errors = products.filter(p => p.status === 'error')
+    await Promise.all(errors.map(p =>
+      fetch('/api/mineracao', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: p.id }),
+      })
+    ))
+    setProducts(prev => prev.filter(p => p.status !== 'error'))
+  }
+
+  async function handleDeleteAll() {
+    if (!confirm(`Remover todos os ${products.length} produtos?`)) return
+    await Promise.all(products.map(p =>
+      fetch('/api/mineracao', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: p.id }),
+      })
+    ))
+    setProducts([])
+    setSelected(null)
+  }
+
   async function handleImageSubmit(id: string, imageUrl: string) {
     await fetch('/api/mineracao/analyze-image', {
       method: 'POST',
@@ -504,16 +530,49 @@ export function MineracaoClient() {
             Análise visual via Claude Vision — {products.length} produto{products.length !== 1 ? 's' : ''}
           </p>
         </div>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <button
-            onClick={load}
-            style={{
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+          {/* View toggle */}
+          <div style={{ display: 'flex', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', overflow: 'hidden' }}>
+            {(['grid', 'list'] as const).map(mode => (
+              <button key={mode} onClick={() => setViewMode(mode)} style={{
+                background: viewMode === mode ? 'var(--surface-2)' : 'none',
+                border: 'none', cursor: 'pointer',
+                color: viewMode === mode ? 'var(--text)' : 'var(--text-4)',
+                padding: '6px 10px', display: 'flex', alignItems: 'center',
+              }}>
+                {mode === 'grid' ? <LayoutGrid size={14} /> : <List size={14} />}
+              </button>
+            ))}
+          </div>
+
+          {/* Delete buttons */}
+          {stats.error > 0 && (
+            <button onClick={handleDeleteErrors} style={{
+              background: 'none', border: '1px solid rgba(248,113,113,0.4)',
+              borderRadius: 'var(--radius-sm)', cursor: 'pointer',
+              color: '#f87171', padding: '7px 10px', fontSize: 12,
+              display: 'flex', alignItems: 'center', gap: 5,
+            }}>
+              <Trash2 size={12} /> Limpar erros ({stats.error})
+            </button>
+          )}
+          {products.length > 0 && (
+            <button onClick={handleDeleteAll} style={{
               background: 'none', border: '1px solid var(--border)',
               borderRadius: 'var(--radius-sm)', cursor: 'pointer',
-              color: 'var(--text-3)', padding: '7px 10px',
+              color: 'var(--text-4)', padding: '7px 10px',
               display: 'flex', alignItems: 'center',
-            }}
-          >
+            }}>
+              <Trash2 size={14} />
+            </button>
+          )}
+
+          <button onClick={load} style={{
+            background: 'none', border: '1px solid var(--border)',
+            borderRadius: 'var(--radius-sm)', cursor: 'pointer',
+            color: 'var(--text-3)', padding: '7px 10px',
+            display: 'flex', alignItems: 'center',
+          }}>
             <RefreshCw size={14} />
           </button>
           <button
@@ -704,19 +763,88 @@ export function MineracaoClient() {
             ? 'Nenhum produto ainda. Clique em "Analisar URLs" para começar.'
             : 'Nenhum produto neste filtro.'}
         </div>
-      ) : (
+      ) : viewMode === 'grid' ? (
         <div style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
           gap: 14,
         }}>
           {sorted.map(p => (
-            <ProductCard
-              key={p.id}
-              product={p}
-              onClick={() => setSelected(p)}
-            />
+            <ProductCard key={p.id} product={p} onClick={() => setSelected(p)} />
           ))}
+        </div>
+      ) : (
+        /* List view */
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          {/* List header */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: '48px 48px 1fr 80px 80px 60px 70px 90px',
+            gap: 12, padding: '6px 12px',
+            fontSize: 10, color: 'var(--text-4)', letterSpacing: 0.5, textTransform: 'uppercase',
+          }}>
+            <span>Score</span>
+            <span></span>
+            <span>Produto</span>
+            <span>Preço</span>
+            <span>Pedidos</span>
+            <span>Rating</span>
+            <span>Status</span>
+            <span>Data</span>
+          </div>
+          {sorted.map(p => {
+            const [rowImgErr, setRowImgErr] = [false, () => {}]
+            return (
+              <div
+                key={p.id}
+                onClick={() => setSelected(p)}
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: '48px 48px 1fr 80px 80px 60px 70px 90px',
+                  gap: 12, padding: '8px 12px',
+                  background: 'var(--surface)',
+                  border: '1px solid var(--border)',
+                  borderRadius: 'var(--radius-sm)',
+                  cursor: 'pointer',
+                  alignItems: 'center',
+                  transition: 'background 0.1s',
+                }}
+                onMouseEnter={e => (e.currentTarget.style.background = 'var(--surface-2)')}
+                onMouseLeave={e => (e.currentTarget.style.background = 'var(--surface)')}
+              >
+                {/* Score */}
+                <span style={{ fontWeight: 800, fontSize: 18, color: scoreColor(p.notreglr_score), lineHeight: 1 }}>
+                  {p.notreglr_score ?? '—'}
+                </span>
+                {/* Thumb */}
+                <div style={{ width: 36, height: 36, borderRadius: 4, overflow: 'hidden', background: 'var(--surface-2)', flexShrink: 0 }}>
+                  {p.images?.[0] ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={p.images[0]} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  ) : null}
+                </div>
+                {/* Title */}
+                <span style={{
+                  fontSize: 12, color: 'var(--text-2)',
+                  overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis',
+                }}>
+                  {p.title ?? p.aliexpress_id ?? '—'}
+                </span>
+                {/* Price */}
+                <span style={{ fontSize: 12, color: 'var(--brand)', fontWeight: 600 }}>
+                  {p.price_min ? `€${p.price_min.toFixed(2)}` : '—'}
+                </span>
+                {/* Orders */}
+                <span style={{ fontSize: 11, color: 'var(--text-4)' }}>{p.orders_count ?? '—'}</span>
+                {/* Rating */}
+                <span style={{ fontSize: 11, color: 'var(--text-4)' }}>{p.rating ? `★ ${p.rating.toFixed(1)}` : '—'}</span>
+                {/* Status */}
+                <StatusDot status={p.status} />
+                {/* Date */}
+                <span style={{ fontSize: 11, color: 'var(--text-4)' }}>{formatDate(p.created_at)}</span>
+              </div>
+            )
+          })}
         </div>
       )}
 

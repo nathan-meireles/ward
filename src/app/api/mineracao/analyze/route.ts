@@ -79,21 +79,31 @@ function extractRating(html: string): { rating: number | null; reviewCount: numb
 
 async function fetchAliExpress(productId: string): Promise<string> {
   const targetUrl = `https://www.aliexpress.com/item/${productId}.html`
-  const workerUrl = process.env.CF_WORKER_URL // ex: https://ali-proxy.SEU_USUARIO.workers.dev
+  const workerUrl = (process.env.CF_WORKER_URL ?? '').trim().replace(/\/$/, '')
 
-  // Tentativa 1: Cloudflare Worker (se configurado)
+  const errors: string[] = []
+
+  // Tentativa 1: Cloudflare Worker
   if (workerUrl) {
     try {
       const proxyUrl = `${workerUrl}?url=${encodeURIComponent(targetUrl)}`
+      console.log('[ali-fetch] worker:', proxyUrl)
       const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(25000) })
       const html = await res.text()
+      console.log('[ali-fetch] worker response:', res.status, html.length, 'chars')
       if (html.length > 5000) return html
-    } catch {
-      // fallback para fetch direto
+      errors.push(`Worker retornou ${html.length} chars (esperado >5000)`)
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
+      errors.push(`Worker error: ${msg}`)
+      console.error('[ali-fetch] worker failed:', msg)
     }
+  } else {
+    errors.push('CF_WORKER_URL não configurado')
+    console.warn('[ali-fetch] CF_WORKER_URL not set')
   }
 
-  // Tentativa 2: fetch direto (mobile UA — funciona em alguns casos)
+  // Tentativa 2: fetch direto mobile UA
   const directUrls = [
     `https://m.aliexpress.com/item/${productId}.html`,
     `https://fr.aliexpress.com/item/${productId}.html`,
@@ -114,11 +124,13 @@ async function fetchAliExpress(productId: string): Promise<string> {
       })
       const html = await res.text()
       if (html.length > 5000) return html
-    } catch {
-      // tenta próxima URL
+      errors.push(`Direct ${url}: ${html.length} chars`)
+    } catch (e) {
+      errors.push(`Direct ${url}: ${e instanceof Error ? e.message : String(e)}`)
     }
   }
-  throw new Error('Não foi possível acessar o produto. Configure CF_WORKER_URL no Vercel.')
+
+  throw new Error(`Fetch falhou: ${errors.join(' | ')}`)
 }
 
 // ─── DOWNLOAD DE IMAGEM → BASE64 ───────────────────────────────────────────
