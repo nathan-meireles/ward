@@ -143,7 +143,7 @@ function StatsBar({ products }: { products: Product[] }) {
   return (
     <div
       className="bento"
-      style={{ gridTemplateColumns: `repeat(${cells.length}, 1fr)`, borderRadius: 'var(--radius-lg)', overflow: 'hidden', marginBottom: 28 }}
+      style={{ gridTemplateColumns: `repeat(${cells.length}, 1fr)`, borderRadius: 'var(--radius-lg)', overflow: 'hidden', marginBottom: 28, border: '1px solid var(--border-input)', backgroundColor: 'rgba(255,255,255,0.12)' }}
     >
       {cells.map(({ label, value, color }) => (
         <div key={label} style={{ padding: '16px 20px' }}>
@@ -1030,7 +1030,7 @@ export function MineracaoClient() {
             return (
               <button key={key} onClick={() => setFilter(key)} style={{
                 background: isActive ? 'var(--surface-2)' : 'transparent',
-                border: `1px solid ${isActive ? color : 'var(--border)'}`,
+                border: `1px solid ${isActive ? color : 'rgba(255,255,255,0.18)'}`,
                 borderRadius: 'var(--radius-full)', padding: '4px 12px', cursor: 'pointer',
                 color: isActive ? color : 'var(--text-3)',
                 fontFamily: 'var(--font-mono)', fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.08em',
