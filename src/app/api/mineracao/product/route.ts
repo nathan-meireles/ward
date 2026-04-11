@@ -1,17 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
-import crypto from 'crypto'
 
-// ─── AliExpress DS API ────────────────────────────────────────────────────────
-// Endpoint: POST https://api-sg.aliexpress.com/sync
-// Method:   aliexpress.ds.product.get
-// Docs:     openservice.aliexpress.com
+// ─── AliExpress product data via server-side fetch ────────────────────────────
+// Fetches aliexpress.com from Vercel datacenter.
+// Title extracted from og:title / <title> tag.
+// Images extracted from alicdn.com CDN URLs embedded in the JS bundle.
+// Price/orders/rating are JS-rendered and not available without OAuth.
 
-const ALI_API = 'https://api-sg.aliexpress.com/sync'
-
-function signRequest(params: Record<string, string>, secret: string): string {
-  const sorted = Object.keys(params).sort()
-  const str = sorted.map(k => `${k}${params[k]}`).join('')
-  return crypto.createHmac('sha256', secret).update(str).digest('hex').toUpperCase()
+const HEADERS = {
+  'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
+  'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+  'Accept-Language': 'en-US,en;q=0.9',
+  'Cache-Control': 'no-cache',
+  'Cookie': 'aep_usuc_f=site=glo&c_tp=USD&region=NL&b_locale=en_US; intl_locale=en_US; xman_us_f=x_locale=en_US&x_site=glo',
 }
 
 export interface AliProductData {
@@ -27,78 +27,82 @@ export interface AliProductData {
   seller_positive_rate: string | null
 }
 
-async function fetchProductFromApi(productId: string): Promise<AliProductData> {
-  const appKey = process.env.ALIEXPRESS_APP_KEY
-  const appSecret = process.env.ALIEXPRESS_APP_SECRET
+function extractTitle(html: string): string | null {
+  // og:title (both attribute orderings)
+  let m = html.match(/property=["']og:title["'][^>]+content=["']([^"']{5,})["']/i)
+  if (!m) m = html.match(/content=["']([^"']{5,})["'][^>]+property=["']og:title["']/i)
+  if (m) {
+    const t = m[1].replace(/\s*[-|–].*AliExpress.*$/i, '').trim()
+    if (t.length > 5) return t
+  }
+  // subject key in embedded JSON
+  const s = html.match(/"subject"\s*:\s*"([^"]{10,300})"/)
+  if (s) return s[1]
+  // <title> tag
+  const t = html.match(/<title[^>]*>([^<]{10,}?)<\/title>/i)
+  if (t) {
+    const clean = t[1].replace(/\s*[-|–].*AliExpress.*$/i, '').replace(/\s*[-|–].*$/, '').trim()
+    if (clean.length > 5) return clean
+  }
+  return null
+}
 
-  if (!appKey || !appSecret) throw new Error('AliExpress API credentials not configured')
+function extractImages(html: string): string[] {
+  const seen = new Set<string>()
+  const images: string[] = []
 
-  const params: Record<string, string> = {
-    method: 'aliexpress.ds.product.get',
-    app_key: appKey,
-    timestamp: Date.now().toString(),
-    sign_method: 'sha256',
-    target_currency: 'USD',
-    target_language: 'EN',
-    ship_to_country: 'NL',
-    product_id: productId,
+  // og:image
+  const og = html.match(/property=["']og:image["'][^>]+content=["']([^"']+)["']/i)
+    ?? html.match(/content=["']([^"']+)["'][^>]+property=["']og:image["']/i)
+  if (og) {
+    const u = og[1].split('?')[0]
+    seen.add(u); images.push(u)
   }
 
-  params.sign = signRequest(params, appSecret)
+  // alicdn.com CDN URLs embedded in the JS bundle
+  const text = html
+  let idx = 0
+  while (images.length < 8) {
+    const start = text.indexOf('alicdn.com/kf/', idx)
+    if (start === -1) break
+    // walk forward to find end of URL
+    let end = start
+    while (end < text.length && !/[\s"'\\<>]/.test(text[end])) end++
+    const raw = text.slice(start, end)
+    // strip query string and trailing garbage
+    const clean = 'https://' + raw.replace(/\?.*$/, '').replace(/[^a-zA-Z0-9/._%:-].*$/, '')
+    if (/\.(jpg|jpeg|png|webp)$/i.test(clean) && !seen.has(clean)) {
+      seen.add(clean); images.push(clean)
+    }
+    idx = end
+  }
 
-  const res = await fetch(ALI_API, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams(params).toString(),
+  return images.slice(0, 6)
+}
+
+async function fetchProductData(productId: string): Promise<AliProductData> {
+  const url = `https://www.aliexpress.com/item/${productId}.html`
+  const res = await fetch(url, {
+    headers: HEADERS,
+    redirect: 'follow',
+    signal: AbortSignal.timeout(20000),
   })
 
-  const json = await res.json()
-  const resp = json?.aliexpress_ds_product_get_response
-
-  if (!resp || resp.rsp_code !== 200) {
-    throw new Error(`API error: ${resp?.rsp_msg ?? JSON.stringify(json).slice(0, 200)}`)
-  }
-
-  const result = resp.result
-  const base = result?.ae_item_base_info_dto ?? {}
-  const media = result?.ae_multimedia_info_dto ?? {}
-  const skus: Array<Record<string, string>> =
-    result?.ae_item_sku_info_dtos?.ae_item_sku_info_d_t_o ?? []
-  const store = result?.ae_store_info ?? {}
-
-  // Images: semicolon-separated string
-  const images: string[] = (media.image_urls ?? '')
-    .split(';')
-    .map((u: string) => u.trim())
-    .filter(Boolean)
-    .slice(0, 6)
-
-  // Price: min/max across all SKUs
-  const prices = skus
-    .map((s) => parseFloat(s.sku_price ?? s.offer_sale_price ?? '0'))
-    .filter((n) => n > 0)
-
-  const price_min = prices.length ? Math.min(...prices) : null
-  const price_max = prices.length ? Math.max(...prices) : null
-
-  const rating = base.avg_evaluation_rating ? parseFloat(base.avg_evaluation_rating) : null
-  const review_count = base.evaluation_count ? parseInt(base.evaluation_count) : null
-  const orders_count = base.order_count ? String(base.order_count) : null
-
-  const positive = store.communication_rating ?? store.positive_num
-  const seller_positive_rate = positive ? `${positive}%` : null
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  const html = await res.text()
+  if (html.length < 2000) throw new Error(`Página muito curta (${html.length} chars)`)
 
   return {
     product_id: productId,
-    title: base.subject ?? null,
-    images,
-    price_min,
-    price_max,
-    orders_count,
-    rating,
-    review_count,
-    seller_name: store.store_name ?? null,
-    seller_positive_rate,
+    title: extractTitle(html),
+    images: extractImages(html),
+    price_min: null,
+    price_max: null,
+    orders_count: null,
+    rating: null,
+    review_count: null,
+    seller_name: null,
+    seller_positive_rate: null,
   }
 }
 
@@ -109,7 +113,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const data = await fetchProductFromApi(id)
+    const data = await fetchProductData(id)
     return NextResponse.json(data)
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err)
