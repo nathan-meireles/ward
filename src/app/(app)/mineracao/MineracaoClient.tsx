@@ -3,177 +3,11 @@
 import { useEffect, useState, useCallback } from 'react'
 import { Trash2, ExternalLink, Loader2, Plus, RefreshCw, ImagePlus, X, ChevronDown, LayoutGrid, List, Search, Download, Tag, Check } from 'lucide-react'
 
-// ─── PROXY: Vercel API route (server-side fetch, evita geo-redirect loop) ─────
-const ALI_PROXY = '/api/mineracao/proxy'
-
-// ─── ALIEXPRESS PARSERS ───────────────────────────────────────────────────────
+// ─── ALIEXPRESS ID EXTRACTOR ─────────────────────────────────────────────────
 
 function clientExtractProductId(url: string): string | null {
   const m = url.match(/\/item\/(\d+)/)
   return m ? m[1] : null
-}
-
-// ─── EMBEDDED JSON EXTRACTOR ─────────────────────────────────────────────────
-// AliExpress embeds product data as JSON in the page HTML.
-// We try to find the main data object and extract from it.
-
-function extractJsonValue(html: string, key: string): string | null {
-  // Try both quoted-string and number value forms
-  const m = html.match(new RegExp(`"${key}"\\s*:\\s*"([^"]{1,500})"`, 'i'))
-    ?? html.match(new RegExp(`"${key}"\\s*:\\s*([0-9.]+)`, 'i'))
-  return m ? m[1] : null
-}
-
-// Rejects strings that look like React component names or code artifacts
-function isRealProductTitle(s: string): boolean {
-  if (!s || s.length < 8) return false
-  if (/^\d+$/.test(s)) return false
-  // Reject single CamelCase words (e.g. "ItemDetailResp", "PageDetail")
-  if (/^[A-Z][a-zA-Z0-9]+$/.test(s.trim())) return false
-  // Must contain at least one space, digit, or non-ASCII char (real titles have these)
-  if (!/[\s\d\u0080-\uFFFF]/.test(s)) return false
-  return true
-}
-
-function clientExtractTitle(html: string): string | null {
-  // 1. og:title — handle both attribute orderings
-  let m = html.match(/property=["']og:title["'][^>]+content=["']([^"']{5,}?)["']/i)
-  if (!m) m = html.match(/content=["']([^"']{5,}?)["'][^>]+property=["']og:title["']/i)
-  if (m) {
-    const t = m[1].replace(/\s*[-|].*AliExpress.*$/i, '').trim()
-    if (isRealProductTitle(t)) return t
-  }
-  // 2. Specific AliExpress product title keys (avoid generic 'title'/'name' that match components)
-  for (const key of ['subject', 'productTitle', 'pdpProductTitle', 'goodsTitle', 'itemTitle']) {
-    const v = extractJsonValue(html, key)
-    if (v && isRealProductTitle(v)) return v
-  }
-  // 3. <title> tag — usually "Product Name - AliExpress"
-  const t = html.match(/<title[^>]*>([^<]{10,}?)<\/title>/i)
-  if (t) {
-    const clean = t[1].replace(/\s*[-|–].*AliExpress.*$/i, '').replace(/\s*[-|–].*$/, '').trim()
-    if (isRealProductTitle(clean)) return clean
-  }
-  // 4. Extract title from CDN image filename in summImagePathList
-  // AliExpress embeds the product title as the image filename: "Product-Name-Words.jpg_80x80.jpg"
-  const imgFilename = html.match(/summImagePathList[^[]*\[[^\]]*\/kf\/[^/]+\/([A-Za-z0-9][^"]+?)\.jpg[_"]/i)
-  if (imgFilename) {
-    const slug = imgFilename[1]
-    // Ignore hash-only filenames (no hyphens = no title)
-    if (slug.includes('-')) {
-      const title = slug.replace(/\.jpg.*$/, '').replace(/-/g, ' ').replace(/\s+/g, ' ').trim()
-      if (isRealProductTitle(title)) return title
-    }
-  }
-  return null
-}
-
-function clientExtractImages(html: string): string[] {
-  const images: string[] = []
-  // og:image both orderings
-  let m = html.match(/property=["']og:image["'][^>]+content=["']([^"']+)["']/i)
-  if (!m) m = html.match(/content=["']([^"']+)["'][^>]+property=["']og:image["']/i)
-  if (m) images.push(m[1].split('?')[0])
-  const re = /"(https:\/\/ae\d+\.alicdn\.com\/kf\/[^"]+\.(?:jpg|jpeg|png|webp))"/gi
-  let match
-  while ((match = re.exec(html)) !== null) {
-    const u = match[1].split('?')[0]
-    if (!images.includes(u)) images.push(u)
-    if (images.length >= 6) break
-  }
-  return images
-}
-
-function clientExtractPrice(html: string): { min: number | null; max: number | null } {
-  // Try min/max pair first
-  const r = html.match(/"minPrice"\s*:\s*"?([0-9.]+)"?[^}]{0,300}"maxPrice"\s*:\s*"?([0-9.]+)"?/)
-  if (r) return { min: parseFloat(r[1]), max: parseFloat(r[2]) }
-
-  // Try various single-price keys (values like "US $12.34" or just "12.34")
-  const priceKeys = ['salePrice', 'formatedActivityPrice', 'activityPrice', 'discountPrice', 'originalPrice', 'price', 'minActivityAmount', 'originalPriceShow']
-  for (const key of priceKeys) {
-    const v = extractJsonValue(html, key)
-    if (!v) continue
-    const nums = v.match(/[0-9]+[.,][0-9]+/g)
-    if (nums) {
-      const prices = nums.map(n => parseFloat(n.replace(',', '.')))
-      return { min: Math.min(...prices), max: Math.max(...prices) }
-    }
-    const plain = parseFloat(v.replace(',', '.'))
-    if (!isNaN(plain) && plain > 0) return { min: plain, max: plain }
-  }
-  return { min: null, max: null }
-}
-
-function clientExtractOrders(html: string): string | null {
-  const keys = ['formatTradeCount', 'tradeCount', 'soldCount', 'totalOrders', 'orderCount', 'salesVolume', 'sold']
-  for (const key of keys) {
-    const v = extractJsonValue(html, key)
-    if (v && v.trim() !== '0') return v
-  }
-  // Inline text like "12k+ sold" or "3,200 sold"
-  const m = html.match(/(\d[\d,k+.]*)\s*(?:sold|orders|vendidos)/i)
-  if (m) return m[1]
-  return null
-}
-
-function clientExtractRating(html: string) {
-  const rKeys = ['averageStar', 'averageStarRate', 'totalAverageStar', 'starRating', 'score', 'ratingValue', 'averageScore']
-  const cKeys = ['totalValidNum', 'evaluateCount', 'feedbackCount', 'reviewCount', 'totalEvaluations', 'reviewTotal', 'ratingCount']
-
-  let rating = null, reviewCount = null
-
-  for (const key of rKeys) {
-    const v = extractJsonValue(html, key)
-    if (v) {
-      const n = parseFloat(v)
-      if (n > 0 && n <= 5) { rating = n; break }
-    }
-  }
-
-  // Also try JSON-LD structured data (often has ratingValue + ratingCount)
-  const jsonLdMatch = html.match(/<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi)
-  if (jsonLdMatch) {
-    for (const block of jsonLdMatch) {
-      try {
-        const json = JSON.parse(block.replace(/<script[^>]*>|<\/script>/gi, ''))
-        const agg = json?.aggregateRating ?? json?.['aggregateRating']
-        if (agg) {
-          if (agg.ratingValue && !rating) {
-            const n = parseFloat(agg.ratingValue)
-            if (n > 0 && n <= 5) rating = n
-          }
-          if (agg.reviewCount && !reviewCount) reviewCount = parseInt(agg.reviewCount)
-          if (agg.ratingCount && !reviewCount) reviewCount = parseInt(agg.ratingCount)
-        }
-      } catch { /* ignore */ }
-    }
-  }
-
-  for (const key of cKeys) {
-    if (reviewCount !== null) break
-    const v = extractJsonValue(html, key)
-    if (v) {
-      const n = parseInt(v)
-      if (n > 0) { reviewCount = n; break }
-    }
-  }
-
-  return { rating, reviewCount }
-}
-
-function clientExtractSeller(html: string): { seller_name: string | null; seller_positive_rate: string | null } {
-  let seller_name = null, seller_positive_rate = null
-
-  for (const key of ['storeName', 'storeTitle', 'sellerName', 'shopName', 'sellerStoreName', 'shopTitle']) {
-    const v = extractJsonValue(html, key)
-    if (v && v.length > 1) { seller_name = v; break }
-  }
-  for (const key of ['sellerPositiveRate', 'positiveRate', 'storeFeedbackScore', 'positivePercent']) {
-    const v = extractJsonValue(html, key)
-    if (v) { seller_positive_rate = v.includes('%') ? v : v + '%'; break }
-  }
-  return { seller_name, seller_positive_rate }
 }
 
 // ─── CONFIRM MODAL ────────────────────────────────────────────────────────────
@@ -824,22 +658,12 @@ export function MineracaoClient() {
         let payload: Record<string, unknown> = { productId, url: rawUrl }
 
         try {
-          const targetUrl = `https://www.aliexpress.com/item/${productId}.html`
-          const proxyUrl = `${ALI_PROXY}?url=${encodeURIComponent(targetUrl)}`
-          const html = await fetch(proxyUrl).then(r => r.text())
-
-          if (html.length > 5000) {
-            payload = {
-              ...payload,
-              title: clientExtractTitle(html),
-              images: clientExtractImages(html),
-              ...clientExtractPrice(html),
-              orders_count: clientExtractOrders(html),
-              ...clientExtractRating(html),
-              ...clientExtractSeller(html),
-            }
+          const apiRes = await fetch(`/api/mineracao/product?id=${productId}`)
+          const data = await apiRes.json()
+          if (!data.error) {
+            payload = { ...payload, ...data }
           } else {
-            payload.fetchError = `HTML muito curto (${html.length} chars)`
+            payload.fetchError = data.error
           }
         } catch (e) {
           payload.fetchError = e instanceof Error ? e.message : 'Erro de fetch'
@@ -930,22 +754,12 @@ export function MineracaoClient() {
         let payload: Record<string, unknown> = { productId, url: p.aliexpress_url }
 
         try {
-          const targetUrl = `https://www.aliexpress.com/item/${productId}.html`
-          const proxyUrl = `${ALI_PROXY}?url=${encodeURIComponent(targetUrl)}`
-          const html = await fetch(proxyUrl).then(r => r.text())
-
-          if (html.length > 5000) {
-            payload = {
-              ...payload,
-              title: clientExtractTitle(html),
-              images: clientExtractImages(html),
-              ...clientExtractPrice(html),
-              orders_count: clientExtractOrders(html),
-              ...clientExtractRating(html),
-              ...clientExtractSeller(html),
-            }
+          const apiRes = await fetch(`/api/mineracao/product?id=${productId}`)
+          const data = await apiRes.json()
+          if (!data.error) {
+            payload = { ...payload, ...data }
           } else {
-            payload.fetchError = `HTML muito curto (${html.length} chars)`
+            payload.fetchError = data.error
           }
         } catch (e) {
           payload.fetchError = e instanceof Error ? e.message : 'Erro de fetch'
