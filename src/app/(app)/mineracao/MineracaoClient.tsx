@@ -3,8 +3,8 @@
 import { useEffect, useState, useCallback } from 'react'
 import { Trash2, ExternalLink, Loader2, Plus, RefreshCw, ImagePlus, X, ChevronDown, LayoutGrid, List, Search, Download, Tag, Check } from 'lucide-react'
 
-// ─── CLOUDFLARE WORKER ────────────────────────────────────────────────────────
-const CF_WORKER = 'https://ali-proxy.nathan-meireles.workers.dev'
+// ─── PROXY: Vercel API route (server-side fetch, evita geo-redirect loop) ─────
+const ALI_PROXY = '/api/mineracao/proxy'
 
 // ─── ALIEXPRESS PARSERS ───────────────────────────────────────────────────────
 
@@ -825,7 +825,7 @@ export function MineracaoClient() {
 
         try {
           const targetUrl = `https://www.aliexpress.com/item/${productId}.html`
-          const proxyUrl = `${CF_WORKER}?url=${encodeURIComponent(targetUrl)}`
+          const proxyUrl = `${ALI_PROXY}?url=${encodeURIComponent(targetUrl)}`
           const html = await fetch(proxyUrl).then(r => r.text())
 
           if (html.length > 5000) {
@@ -931,7 +931,7 @@ export function MineracaoClient() {
 
         try {
           const targetUrl = `https://www.aliexpress.com/item/${productId}.html`
-          const proxyUrl = `${CF_WORKER}?url=${encodeURIComponent(targetUrl)}`
+          const proxyUrl = `${ALI_PROXY}?url=${encodeURIComponent(targetUrl)}`
           const html = await fetch(proxyUrl).then(r => r.text())
 
           if (html.length > 5000) {
