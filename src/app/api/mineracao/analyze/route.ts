@@ -123,11 +123,11 @@ export async function POST(request: NextRequest) {
       url,
       title,
       images,
-      min: priceMin,
-      max: priceMax,
+      price_min: priceMin,
+      price_max: priceMax,
       orders_count,
       rating,
-      reviewCount,
+      review_count: reviewCount,
       seller_name,
       seller_positive_rate,
       fetchError,
@@ -136,11 +136,11 @@ export async function POST(request: NextRequest) {
       url: string
       title?: string
       images?: string[]
-      min?: number
-      max?: number
+      price_min?: number
+      price_max?: number
       orders_count?: string
       rating?: number
-      reviewCount?: number
+      review_count?: number
       seller_name?: string
       seller_positive_rate?: string
       fetchError?: string
