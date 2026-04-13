@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Bookmark, Package, Megaphone, CheckSquare, BarChart2, Sun, Moon, FlaskConical, BookOpen, ChevronDown, TrendingUp } from 'lucide-react'
+import { Bookmark, Package, Megaphone, CheckSquare, BarChart2, Sun, Moon, FlaskConical, BookOpen, ChevronDown, TrendingUp, Crosshair, BarChart3, Users } from 'lucide-react'
 import { useEffect, useState } from 'react'
 
 const NAV = [
@@ -11,6 +11,9 @@ const NAV = [
   { href: '/produtos',   icon: Package,      label: 'Produtos'   },
   { href: '/esteira',    icon: TrendingUp,   label: 'Esteira'    },
   { href: '/criativos',  icon: Megaphone,    label: 'Criativos'  },
+  { href: '/campanhas',  icon: Crosshair,    label: 'Campanhas'  },
+  { href: '/cenarios',   icon: BarChart3,    label: 'Cenários'   },
+  { href: '/audiencias', icon: Users,        label: 'Audiências' },
   { href: '/tarefas',    icon: CheckSquare,  label: 'Tarefas'    },
   { href: '/benchmark',  icon: BarChart2,    label: 'Benchmark'  },
 ]

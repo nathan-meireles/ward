@@ -1,160 +1,274 @@
 'use client'
 
+/**
+ * /esteira — Pipeline de Testes
+ *
+ * Propósito: gerenciar o fluxo de validação dos produtos via Meta Ads.
+ * 4 estágios: A Testar → Testando → Validado / Descartado
+ * Cada card mostra CPA ideal, CPA máximo, ROAS mínimo.
+ *
+ * Diferença de /produtos:
+ *   Produtos = catálogo/database (todos os produtos, dados financeiros)
+ *   Esteira  = pipeline (quais estão sendo testados agora, decisão kill/scale)
+ */
+
 import { useEffect, useState, useCallback } from 'react'
-import { Loader2, ChevronRight, Package, FlaskConical, Megaphone, TrendingUp } from 'lucide-react'
+import { Loader2, ChevronRight, ChevronLeft, Package, FlaskConical, Megaphone, TrendingUp, X, Info } from 'lucide-react'
 import { ProductDrawer, type ProductFull } from '@/components/products/ProductDrawer'
 import { calcPricing, fmtEur, fmtPct } from '@/lib/pricing'
 
-// ─── Types & Helpers ──────────────────────────────────────────────────────────
-
 type PipelineStatus = 'a_testar' | 'testando' | 'validado' | 'descartado'
 
-const COLUMNS: Array<{ key: PipelineStatus; label: string; color: string; description: string }> = [
-  { key: 'a_testar',    label: 'A Testar',    color: 'var(--text-3)',  description: 'Produtos aguardando entrada no teste' },
-  { key: 'testando',    label: 'Testando',    color: 'var(--warning)', description: 'Ads ativos, coletando dados' },
-  { key: 'validado',    label: 'Validado',    color: 'var(--success)', description: 'Kill criteria positivos' },
-  { key: 'descartado',  label: 'Descartado',  color: 'var(--error)',   description: 'Kill criteria negativos' },
+const COLUMNS: Array<{
+  key: PipelineStatus
+  label: string
+  color: string
+  bg: string
+  description: string
+  next: PipelineStatus | null
+  prev: PipelineStatus | null
+}> = [
+  {
+    key: 'a_testar',
+    label: 'A Testar',
+    color: 'var(--text-3)',
+    bg: 'rgba(175,175,175,0.06)',
+    description: 'Aguardando início do teste',
+    next: 'testando',
+    prev: null,
+  },
+  {
+    key: 'testando',
+    label: 'Testando',
+    color: 'var(--warning)',
+    bg: 'rgba(251,191,36,0.06)',
+    description: 'Ads ativos · coletando dados',
+    next: null, // pode ir para validado OU descartado
+    prev: 'a_testar',
+  },
+  {
+    key: 'validado',
+    label: 'Validado',
+    color: 'var(--success)',
+    bg: 'rgba(74,222,128,0.06)',
+    description: 'Kill criteria aprovados · escalar',
+    next: null,
+    prev: 'testando',
+  },
+  {
+    key: 'descartado',
+    label: 'Descartado',
+    color: 'var(--error)',
+    bg: 'rgba(248,113,113,0.06)',
+    description: 'Kill criteria negativos · encerrado',
+    next: null,
+    prev: 'testando',
+  },
 ]
 
-function scoreColor(score: number | null) {
-  if (score === null) return 'var(--text-4)'
-  if (score >= 70) return 'var(--success)'
-  if (score >= 50) return 'var(--warning)'
-  return 'var(--error)'
+// Kill criteria da Simo B. (resumo visual)
+const KILL_CRITERIA = [
+  { spend: '€10', rule: 'CPC > €1 ou zero ATC → mata' },
+  { spend: '€20', rule: 'Zero ATC → mata' },
+  { spend: '€30', rule: 'Zero compras → para' },
+  { spend: '€60', rule: '< 2 compras → para · ≥ 2 → escala' },
+]
+
+function scoreColor(s: number | null) {
+  if (!s) return 'var(--text-4)'
+  return s >= 70 ? 'var(--success)' : s >= 50 ? 'var(--warning)' : 'var(--error)'
+}
+
+// ─── Kill Criteria Panel ──────────────────────────────────────────────────────
+
+function KillCriteriaPanel({ onClose }: { onClose: () => void }) {
+  return (
+    <div style={{
+      background: 'var(--surface-2)', border: '1px solid var(--border)',
+      borderRadius: 'var(--radius-lg)', padding: '16px 18px', marginBottom: 20,
+    }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+        <span style={{ fontSize: 10, color: 'var(--text-4)', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+          Kill Criteria · Framework Simo B.
+        </span>
+        <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-4)' }}>
+          <X size={13} />
+        </button>
+      </div>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        {KILL_CRITERIA.map(({ spend, rule }) => (
+          <div key={spend} style={{ padding: '6px 10px', background: 'var(--surface-3)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)' }}>
+            <span style={{ fontSize: 11, color: 'var(--brand)', fontFamily: 'var(--font-mono)', fontWeight: 700 }}>{spend}</span>
+            <span style={{ fontSize: 11, color: 'var(--text-3)', marginLeft: 8 }}>{rule}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
 }
 
 // ─── Kanban Card ──────────────────────────────────────────────────────────────
 
 function KanbanCard({
   product,
+  column,
   onMove,
   onClick,
   moving,
 }: {
   product: ProductFull
-  onMove: (id: string, status: PipelineStatus) => void
+  column: typeof COLUMNS[0]
+  onMove: (id: string, to: PipelineStatus) => void
   onClick: () => void
   moving: boolean
 }) {
   const [imgErr, setImgErr] = useState(false)
-  const mainImg = product.images?.[0]
   const pricing = product.product_pricing
   const calc = pricing ? calcPricing({
-    cog_eur: pricing.cog_eur,
-    freight_eur: pricing.freight_eur,
-    sale_price_eur: pricing.sale_price_eur,
-    coupon_pct: pricing.coupon_pct,
-    iof_rate: pricing.iof_rate,
-    checkout_fee_rate: pricing.checkout_fee_rate,
+    cog_eur: pricing.cog_eur, freight_eur: pricing.freight_eur,
+    sale_price_eur: pricing.sale_price_eur, coupon_pct: pricing.coupon_pct,
+    iof_rate: pricing.iof_rate, checkout_fee_rate: pricing.checkout_fee_rate,
     gateway_fee_rate: pricing.gateway_fee_rate,
     marketing_allocation_pct: pricing.marketing_allocation_pct,
     other_taxes_rate: pricing.other_taxes_rate,
   }) : null
 
-  const currentIdx = COLUMNS.findIndex(c => c.key === product.pipeline_status)
-  const nextCol = currentIdx < COLUMNS.length - 1 ? COLUMNS[currentIdx + 1] : null
-
   return (
-    <div
-      style={{
-        background: 'var(--surface-2)',
-        border: '1px solid var(--border)',
-        borderRadius: 'var(--radius)',
-        overflow: 'hidden',
-        opacity: moving ? 0.6 : 1,
-        transition: 'opacity 0.2s',
-      }}
-    >
-      {/* Image strip */}
-      <div
-        onClick={onClick}
-        style={{ height: 72, background: 'var(--surface-3)', overflow: 'hidden', cursor: 'pointer', position: 'relative' }}
-      >
-        {mainImg && !imgErr
-          ? <img src={mainImg} alt={product.name} onError={() => setImgErr(true)} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-          : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Package size={18} style={{ color: 'var(--text-4)' }} /></div>
-        }
-        {/* Score badge */}
-        {product.notreglr_score !== null && (
-          <div style={{
-            position: 'absolute', bottom: 6, right: 8,
-            fontSize: 16, fontWeight: 900, fontFamily: 'var(--font-alt)',
-            color: scoreColor(product.notreglr_score), lineHeight: 1,
-            textShadow: '0 1px 4px rgba(0,0,0,0.8)',
-          }}>
-            {product.notreglr_score}
-          </div>
-        )}
-      </div>
-
-      {/* Body */}
-      <div style={{ padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 8 }} onClick={onClick}>
-        <p style={{ fontSize: 12, fontWeight: 500, color: 'var(--text-2)', lineHeight: 1.4, margin: 0, cursor: 'pointer', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
-          {product.name}
-        </p>
-
-        {/* Pricing mini */}
-        {calc ? (
-          <div style={{ display: 'flex', gap: 6 }}>
-            <span style={{ fontSize: 10, color: 'var(--brand)', fontFamily: 'var(--font-mono)', fontWeight: 600 }}>
-              {fmtEur(pricing?.sale_price_eur)}
-            </span>
-            <span style={{ fontSize: 10, color: calc.netProfit > 0 ? 'var(--success)' : 'var(--error)', fontFamily: 'var(--font-mono)' }}>
-              {fmtEur(calc.netProfit)} / {fmtPct(calc.profitMarginPct)}
-            </span>
-          </div>
-        ) : (
-          <span style={{ fontSize: 9, color: 'var(--text-4)', fontFamily: 'var(--font-mono)', fontStyle: 'italic' }}>sem preço</span>
-        )}
-
-        {/* CPA */}
-        {calc && (
-          <div style={{ display: 'flex', gap: 8 }}>
-            <span style={{ fontSize: 9, color: 'var(--text-4)', fontFamily: 'var(--font-mono)' }}>
-              CPA ideal <span style={{ color: 'var(--info)', fontWeight: 600 }}>{fmtEur(calc.cpaIdeal)}</span>
-            </span>
-            <span style={{ fontSize: 9, color: 'var(--text-4)', fontFamily: 'var(--font-mono)' }}>
-              CPA máx <span style={{ color: 'var(--text-3)', fontWeight: 600 }}>{fmtEur(calc.cpaMax)}</span>
-            </span>
-          </div>
-        )}
-
-        {/* Modules */}
-        <div style={{ display: 'flex', gap: 5, alignItems: 'center' }}>
-          {product.mineracao_id && <span title="Na Mineração"><FlaskConical size={10} style={{ color: 'var(--info)' }} /></span>}
-          {product.creatives?.length > 0 && (
-            <span style={{ fontSize: 9, color: 'var(--brand)', display: 'flex', alignItems: 'center', gap: 2, fontFamily: 'var(--font-mono)' }}>
-              <Megaphone size={9} /> {product.creatives.length}
-            </span>
-          )}
-          {product.ad_campaigns?.length > 0 && (
-            <span style={{ fontSize: 9, color: 'var(--warning)', display: 'flex', alignItems: 'center', gap: 2, fontFamily: 'var(--font-mono)' }}>
-              <TrendingUp size={9} /> {product.ad_campaigns.length}
+    <div style={{
+      background: 'var(--surface)',
+      border: `1px solid var(--border)`,
+      borderLeft: `3px solid ${column.color}`,
+      borderRadius: 'var(--radius)',
+      overflow: 'hidden',
+      opacity: moving ? 0.5 : 1,
+      transition: 'opacity 0.2s, box-shadow 0.15s',
+    }}>
+      {/* Image + name row */}
+      <div onClick={onClick} style={{ display: 'flex', gap: 10, padding: '10px 12px', cursor: 'pointer', alignItems: 'center' }}>
+        <div style={{ width: 44, height: 44, borderRadius: 6, overflow: 'hidden', background: 'var(--surface-2)', flexShrink: 0 }}>
+          {product.images?.[0] && !imgErr
+            ? <img src={product.images[0]} alt="" onError={() => setImgErr(true)} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Package size={14} style={{ color: 'var(--text-4)' }} /></div>
+          }
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <p style={{ fontSize: 12, fontWeight: 500, color: 'var(--text-2)', margin: 0, lineHeight: 1.4, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
+            {product.name}
+          </p>
+          {product.notreglr_score !== null && (
+            <span style={{ fontSize: 11, fontWeight: 700, color: scoreColor(product.notreglr_score), fontFamily: 'var(--font-mono)' }}>
+              {product.notreglr_score}pts
             </span>
           )}
         </div>
       </div>
 
-      {/* Move to next stage */}
-      {nextCol && product.pipeline_status !== 'descartado' && (
-        <div style={{ borderTop: '1px solid var(--border)', padding: '6px 10px' }}>
+      {/* Financial metrics */}
+      {calc ? (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 1, borderTop: '1px solid var(--border)' }}>
+          {[
+            { label: 'CPA ideal', value: fmtEur(calc.cpaIdeal), color: 'var(--info)' },
+            { label: 'CPA máx', value: fmtEur(calc.cpaMax), color: 'var(--text-3)' },
+            { label: 'ROAS mín', value: `${calc.roasMin.toFixed(1)}x`, color: 'var(--brand)' },
+          ].map(({ label, value, color }) => (
+            <div key={label} style={{ padding: '6px 8px', background: 'var(--surface-2)', textAlign: 'center' }}>
+              <div style={{ fontSize: 8, color: 'var(--text-4)', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>{label}</div>
+              <div style={{ fontSize: 12, color, fontFamily: 'var(--font-mono)', fontWeight: 600, lineHeight: 1.4 }}>{value}</div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div style={{ padding: '6px 12px', borderTop: '1px solid var(--border)', fontSize: 10, color: 'var(--text-4)', fontFamily: 'var(--font-mono)', fontStyle: 'italic' }}>
+          Configure preço para ver CPA/ROAS
+        </div>
+      )}
+
+      {/* Margin + links */}
+      {calc && (
+        <div style={{ display: 'flex', gap: 8, padding: '5px 12px', alignItems: 'center', borderTop: '1px solid var(--border)' }}>
+          <span style={{ fontSize: 10, color: calc.netProfit > 0 ? 'var(--success)' : 'var(--error)', fontFamily: 'var(--font-mono)' }}>
+            {fmtEur(pricing?.sale_price_eur)} · {fmtEur(calc.netProfit)} · {fmtPct(calc.profitMarginPct)}
+          </span>
+          <div style={{ marginLeft: 'auto', display: 'flex', gap: 5, alignItems: 'center' }}>
+            {product.mineracao_id && <FlaskConical size={10} style={{ color: 'var(--info)' }} />}
+            {product.creatives?.length > 0 && (
+              <span style={{ fontSize: 9, color: 'var(--brand)', fontFamily: 'var(--font-mono)', display: 'flex', alignItems: 'center', gap: 2 }}>
+                <Megaphone size={9} />{product.creatives.length}
+              </span>
+            )}
+            {product.ad_campaigns?.length > 0 && (
+              <span style={{ fontSize: 9, color: 'var(--warning)', fontFamily: 'var(--font-mono)', display: 'flex', alignItems: 'center', gap: 2 }}>
+                <TrendingUp size={9} />{product.ad_campaigns.length}
+              </span>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Move buttons */}
+      <div style={{ display: 'flex', gap: 4, padding: '6px 10px', borderTop: '1px solid var(--border)' }}>
+        {/* Back */}
+        {column.prev && (
           <button
-            onClick={e => { e.stopPropagation(); onMove(product.id, nextCol.key) }}
+            onClick={e => { e.stopPropagation(); onMove(product.id, column.prev!) }}
             disabled={moving}
             style={{
-              width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
-              padding: '5px 8px', fontSize: 10, cursor: 'pointer',
-              background: `color-mix(in srgb, ${nextCol.color} 10%, transparent)`,
-              border: `1px solid color-mix(in srgb, ${nextCol.color} 30%, transparent)`,
-              borderRadius: 'var(--radius-sm)', color: nextCol.color,
-              fontFamily: 'var(--font-mono)', letterSpacing: '0.06em',
+              flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3,
+              padding: '4px', fontSize: 9, cursor: 'pointer', borderRadius: 'var(--radius-sm)',
+              border: '1px solid var(--border)', background: 'transparent',
+              color: 'var(--text-4)', fontFamily: 'var(--font-mono)',
               transition: 'all 0.15s',
             }}
           >
-            → {nextCol.label} <ChevronRight size={9} />
+            <ChevronLeft size={9} /> {COLUMNS.find(c => c.key === column.prev)?.label}
           </button>
-        </div>
-      )}
+        )}
+
+        {/* Forward — "Testando" can go to Validado or Descartado */}
+        {column.key === 'testando' ? (
+          <>
+            <button
+              onClick={e => { e.stopPropagation(); onMove(product.id, 'validado') }}
+              disabled={moving}
+              style={{
+                flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3,
+                padding: '4px', fontSize: 9, cursor: 'pointer', borderRadius: 'var(--radius-sm)',
+                border: '1px solid var(--success)', background: 'rgba(74,222,128,0.08)',
+                color: 'var(--success)', fontFamily: 'var(--font-mono)', transition: 'all 0.15s',
+              }}
+            >
+              ✓ Validar
+            </button>
+            <button
+              onClick={e => { e.stopPropagation(); onMove(product.id, 'descartado') }}
+              disabled={moving}
+              style={{
+                flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3,
+                padding: '4px', fontSize: 9, cursor: 'pointer', borderRadius: 'var(--radius-sm)',
+                border: '1px solid var(--error)', background: 'rgba(248,113,113,0.08)',
+                color: 'var(--error)', fontFamily: 'var(--font-mono)', transition: 'all 0.15s',
+              }}
+            >
+              ✗ Descartar
+            </button>
+          </>
+        ) : column.next ? (
+          <button
+            onClick={e => { e.stopPropagation(); onMove(product.id, column.next!) }}
+            disabled={moving}
+            style={{
+              flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3,
+              padding: '4px', fontSize: 9, cursor: 'pointer', borderRadius: 'var(--radius-sm)',
+              border: `1px solid ${COLUMNS.find(c => c.key === column.next)?.color}`,
+              background: `color-mix(in srgb, ${COLUMNS.find(c => c.key === column.next)?.color} 10%, transparent)`,
+              color: COLUMNS.find(c => c.key === column.next)?.color,
+              fontFamily: 'var(--font-mono)', transition: 'all 0.15s',
+            }}
+          >
+            {COLUMNS.find(c => c.key === column.next)?.label} <ChevronRight size={9} />
+          </button>
+        ) : null}
+      </div>
     </div>
   )
 }
@@ -162,44 +276,57 @@ function KanbanCard({
 // ─── Column ───────────────────────────────────────────────────────────────────
 
 function KanbanColumn({
-  column,
-  products,
-  onMove,
-  onCardClick,
-  movingId,
+  column, products, onMove, onCardClick, movingId,
 }: {
   column: typeof COLUMNS[0]
   products: ProductFull[]
-  onMove: (id: string, status: PipelineStatus) => void
+  onMove: (id: string, to: PipelineStatus) => void
   onCardClick: (id: string) => void
   movingId: string | null
 }) {
+  const totalBudget = products.reduce((acc, p) => {
+    const c = p.product_pricing ? calcPricing({
+      cog_eur: p.product_pricing.cog_eur, freight_eur: p.product_pricing.freight_eur,
+      sale_price_eur: p.product_pricing.sale_price_eur, coupon_pct: p.product_pricing.coupon_pct,
+      iof_rate: p.product_pricing.iof_rate, checkout_fee_rate: p.product_pricing.checkout_fee_rate,
+      gateway_fee_rate: p.product_pricing.gateway_fee_rate,
+      marketing_allocation_pct: p.product_pricing.marketing_allocation_pct,
+      other_taxes_rate: p.product_pricing.other_taxes_rate,
+    }) : null
+    return acc + (c?.cpaIdeal ?? 0)
+  }, 0)
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
       {/* Column header */}
       <div style={{
-        padding: '10px 12px', marginBottom: 10,
-        borderBottom: `2px solid ${column.color}`,
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '10px 14px 10px', marginBottom: 10,
+        background: column.bg,
+        border: `1px solid color-mix(in srgb, ${column.color} 25%, transparent)`,
+        borderRadius: 'var(--radius)',
       }}>
-        <div>
-          <div style={{ fontSize: 11, fontWeight: 600, color: column.color, fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+          <span style={{ fontSize: 12, fontWeight: 700, color: column.color, fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
             {column.label}
-          </div>
-          <div style={{ fontSize: 9, color: 'var(--text-4)', marginTop: 2, fontFamily: 'var(--font-mono)' }}>
-            {column.description}
-          </div>
+          </span>
+          <span style={{
+            minWidth: 22, height: 22, borderRadius: 'var(--radius-full)',
+            background: `color-mix(in srgb, ${column.color} 20%, transparent)`,
+            color: column.color, fontSize: 11, fontWeight: 700,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontFamily: 'var(--font-mono)',
+          }}>
+            {products.length}
+          </span>
         </div>
-        <span style={{
-          minWidth: 22, height: 22, borderRadius: 'var(--radius-full)',
-          background: `color-mix(in srgb, ${column.color} 15%, transparent)`,
-          border: `1px solid color-mix(in srgb, ${column.color} 40%, transparent)`,
-          color: column.color, fontSize: 11, fontWeight: 700,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontFamily: 'var(--font-mono)',
-        }}>
-          {products.length}
-        </span>
+        <div style={{ fontSize: 9, color: 'var(--text-4)', fontFamily: 'var(--font-mono)' }}>
+          {column.description}
+        </div>
+        {column.key === 'testando' && totalBudget > 0 && (
+          <div style={{ fontSize: 9, color: column.color, fontFamily: 'var(--font-mono)', marginTop: 3 }}>
+            CPA ideal total: {fmtEur(totalBudget)}
+          </div>
+        )}
       </div>
 
       {/* Cards */}
@@ -208,7 +335,7 @@ function KanbanColumn({
           <div style={{
             border: '1px dashed var(--border)', borderRadius: 'var(--radius)',
             padding: '20px 12px', textAlign: 'center',
-            color: 'var(--text-4)', fontSize: 10, fontFamily: 'var(--font-mono)',
+            color: 'var(--text-4)', fontSize: 9, fontFamily: 'var(--font-mono)',
             textTransform: 'uppercase', letterSpacing: '0.08em',
           }}>
             vazio
@@ -218,6 +345,7 @@ function KanbanColumn({
             <KanbanCard
               key={p.id}
               product={p}
+              column={column}
               onMove={onMove}
               onClick={() => onCardClick(p.id)}
               moving={movingId === p.id}
@@ -236,6 +364,7 @@ export function EsteiraClient() {
   const [loading, setLoading] = useState(true)
   const [movingId, setMovingId] = useState<string | null>(null)
   const [drawerProductId, setDrawerProductId] = useState<string | null>(null)
+  const [showKillCriteria, setShowKillCriteria] = useState(false)
 
   const load = useCallback(async () => {
     const res = await fetch('/api/products')
@@ -247,7 +376,6 @@ export function EsteiraClient() {
 
   async function handleMove(id: string, newStatus: PipelineStatus) {
     setMovingId(id)
-    // Optimistic update
     setProducts(prev => prev.map(p => p.id === id ? { ...p, pipeline_status: newStatus } : p))
     await fetch('/api/products', {
       method: 'PATCH',
@@ -257,27 +385,35 @@ export function EsteiraClient() {
     setMovingId(null)
   }
 
-  const columnProducts = (key: PipelineStatus) => products.filter(p => p.pipeline_status === key)
-
-  // Summary stats
-  const totalBudget = products
-    .filter(p => p.pipeline_status === 'testando' && p.ad_campaigns?.some(c => c.status === 'testando'))
-    .reduce((acc) => acc, 0)
+  const testando = products.filter(p => p.pipeline_status === 'testando').length
 
   return (
     <div>
       {/* Header */}
-      <div style={{ marginBottom: 28 }}>
-        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-4)', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 8 }}>
-          WARD / ESTEIRA
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 8, gap: 16 }}>
+        <div>
+          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-4)', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 8 }}>
+            WARD / ESTEIRA DE TESTES
+          </div>
+          <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 28, fontWeight: 400, letterSpacing: '0.04em', color: 'var(--text)', margin: 0, lineHeight: 1 }}>
+            Esteira
+          </h1>
         </div>
-        <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 28, fontWeight: 400, letterSpacing: '0.04em', color: 'var(--text)', margin: 0, lineHeight: 1 }}>
-          Esteira de Testes
-        </h1>
-        <p style={{ color: 'var(--text-4)', fontSize: 11, marginTop: 8, fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
-          {products.length} produto{products.length !== 1 ? 's' : ''} · pipeline de validação
-        </p>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button onClick={() => setShowKillCriteria(v => !v)} className="btn btn-ghost" style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+            <Info size={13} /> Kill Criteria
+          </button>
+          <a href="/produtos" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, textDecoration: 'none' }} className="btn btn-secondary">
+            <Package size={13} /> Ver Catálogo
+          </a>
+        </div>
       </div>
+      <p style={{ color: 'var(--text-4)', fontSize: 11, marginBottom: 20, fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+        {products.length} produto{products.length !== 1 ? 's' : ''} na pipeline
+        {testando > 0 && <span style={{ color: 'var(--warning)', marginLeft: 10 }}>· {testando} testando agora</span>}
+      </p>
+
+      {showKillCriteria && <KillCriteriaPanel onClose={() => setShowKillCriteria(false)} />}
 
       {loading ? (
         <div style={{ display: 'flex', justifyContent: 'center', padding: 80 }}>
@@ -285,17 +421,18 @@ export function EsteiraClient() {
         </div>
       ) : products.length === 0 ? (
         <div style={{ border: '1px dashed var(--border)', borderRadius: 'var(--radius-lg)', padding: '64px 24px', textAlign: 'center' }}>
+          <TrendingUp size={28} style={{ color: 'var(--text-4)', marginBottom: 12 }} />
           <p style={{ color: 'var(--text-4)', fontSize: 11, fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '0.1em', margin: 0 }}>
-            Nenhum produto na esteira. Use a Mineração para enviar produtos.
+            Nenhum produto. Use a Mineração para enviar produtos para a esteira.
           </p>
         </div>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14 }}>
           {COLUMNS.map(col => (
             <KanbanColumn
               key={col.key}
               column={col}
-              products={columnProducts(col.key)}
+              products={products.filter(p => p.pipeline_status === col.key)}
               onMove={handleMove}
               onCardClick={id => setDrawerProductId(id)}
               movingId={movingId}
@@ -304,16 +441,8 @@ export function EsteiraClient() {
         </div>
       )}
 
-      {/* ProductDrawer */}
-      <ProductDrawer
-        productId={drawerProductId}
-        onClose={() => setDrawerProductId(null)}
-        onUpdate={load}
-      />
-
-      <style>{`
-        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-      `}</style>
+      <ProductDrawer productId={drawerProductId} onClose={() => setDrawerProductId(null)} onUpdate={load} />
+      <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
     </div>
   )
 }

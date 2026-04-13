@@ -573,8 +573,14 @@ function ListRow({ product, onClick, selected, onToggleSelect }: {
 
 // ─── BULK ACTION BAR ──────────────────────────────────────────────────────────
 
-function BulkActionBar({ count, onDelete, onExport, onRefetch, onClear }: {
-  count: number; onDelete: () => void; onExport: () => void; onRefetch: () => void; onClear: () => void
+function BulkActionBar({ count, onDelete, onExport, onRefetch, onPromoteAll, onClear, promoting }: {
+  count: number
+  onDelete: () => void
+  onExport: () => void
+  onRefetch: () => void
+  onPromoteAll: () => void
+  onClear: () => void
+  promoting: boolean
 }) {
   return (
     <div style={{
@@ -592,6 +598,13 @@ function BulkActionBar({ count, onDelete, onExport, onRefetch, onClear }: {
       <span style={{ fontSize: 11, color: 'var(--text-3)', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
         {count} sel.
       </span>
+      <div style={{ width: 1, height: 16, background: 'var(--border-2)' }} />
+      <button onClick={onPromoteAll} disabled={promoting} className="btn btn-primary" style={{ minHeight: 28, padding: '4px 12px' }}>
+        {promoting
+          ? <><Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} /> Enviando…</>
+          : <><TrendingUp size={12} /> Enviar para Esteira</>
+        }
+      </button>
       <div style={{ width: 1, height: 16, background: 'var(--border-2)' }} />
       <button onClick={onRefetch} className="btn btn-ghost" style={{ minHeight: 28, padding: '4px 10px' }}>
         <RefreshCw size={12} /> Atualizar dados
@@ -634,6 +647,7 @@ export function MineracaoClient() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [confirmAction, setConfirmAction] = useState<{ title: string; body: string; onConfirm: () => void } | null>(null)
   const [promotedIds, setPromotedIds] = useState<Set<string>>(new Set())
+  const [promotingBulk, setPromotingBulk] = useState(false)
 
   const load = useCallback(async () => {
     const res = await fetch('/api/mineracao')
@@ -822,6 +836,19 @@ export function MineracaoClient() {
       setAnalyzeProgress(null)
       setSelectedIds(new Set())
     }
+  }
+
+  async function handlePromoteSelected() {
+    const ids = Array.from(selectedIds)
+    const eligible = ids.filter(id => {
+      const p = products.find(p => p.id === id)
+      return p && (p.notreglr_score ?? 0) >= 50 && !promotedIds.has(p.id)
+    })
+    if (!eligible.length) return
+    setPromotingBulk(true)
+    await Promise.all(eligible.map(id => handlePromote(id)))
+    setPromotingBulk(false)
+    setSelectedIds(new Set())
   }
 
   async function handlePromote(mineracaoId: string) {
@@ -1235,7 +1262,9 @@ export function MineracaoClient() {
           onDelete={handleDeleteSelected}
           onExport={() => exportCSV(products.filter(p => selectedIds.has(p.id)))}
           onRefetch={() => handleRefetch(products.filter(p => selectedIds.has(p.id)))}
+          onPromoteAll={handlePromoteSelected}
           onClear={() => setSelectedIds(new Set())}
+          promoting={promotingBulk}
         />
       )}
 
