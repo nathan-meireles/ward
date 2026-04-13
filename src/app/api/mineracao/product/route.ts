@@ -1,18 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-// ─── AliExpress product data via server-side fetch ────────────────────────────
-// Fetches aliexpress.com from Vercel datacenter.
-// Title extracted from og:title / <title> tag.
-// Images extracted from alicdn.com CDN URLs embedded in the JS bundle.
-// Price/orders/rating are JS-rendered and not available without OAuth.
+// ─── AliExpress product data via RapidAPI DataHub ─────────────────────────────
+// item_detail_2 → title, price, images
+// item_review   → rating, reviewCount
+// Chamadas em paralelo por produto.
 
-const HEADERS = {
-  'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
-  'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-  'Accept-Language': 'en-US,en;q=0.9',
-  'Cache-Control': 'no-cache',
-  'Cookie': 'aep_usuc_f=site=glo&c_tp=USD&region=NL&b_locale=en_US; intl_locale=en_US; xman_us_f=x_locale=en_US&x_site=glo',
-}
+const RAPIDAPI_HOST = 'aliexpress-datahub.p.rapidapi.com'
+const RAPIDAPI_BASE = `https://${RAPIDAPI_HOST}`
 
 export interface AliProductData {
   product_id: string
@@ -27,80 +21,91 @@ export interface AliProductData {
   seller_positive_rate: string | null
 }
 
-function extractTitle(html: string): string | null {
-  // og:title (both attribute orderings)
-  let m = html.match(/property=["']og:title["'][^>]+content=["']([^"']{5,})["']/i)
-  if (!m) m = html.match(/content=["']([^"']{5,})["'][^>]+property=["']og:title["']/i)
-  if (m) {
-    const t = m[1].replace(/\s*[-|–].*AliExpress.*$/i, '').trim()
-    if (t.length > 5) return t
+function rapidapiHeaders(): Record<string, string> {
+  return {
+    'x-rapidapi-host': RAPIDAPI_HOST,
+    'x-rapidapi-key': process.env.RAPIDAPI_KEY ?? '',
   }
-  // subject key in embedded JSON
-  const s = html.match(/"subject"\s*:\s*"([^"]{10,300})"/)
-  if (s) return s[1]
-  // <title> tag
-  const t = html.match(/<title[^>]*>([^<]{10,}?)<\/title>/i)
-  if (t) {
-    const clean = t[1].replace(/\s*[-|–].*AliExpress.*$/i, '').replace(/\s*[-|–].*$/, '').trim()
-    if (clean.length > 5) return clean
-  }
-  return null
 }
 
-function extractImages(html: string): string[] {
-  const seen = new Set<string>()
-  const images: string[] = []
+async function fetchDetail(productId: string): Promise<{
+  title: string | null
+  images: string[]
+  price_min: number | null
+  price_max: number | null
+}> {
+  const url = new URL(`${RAPIDAPI_BASE}/item_detail_2`)
+  url.searchParams.set('itemId', productId)
+  url.searchParams.set('currency', 'EUR')
+  url.searchParams.set('region', 'NL')
+  url.searchParams.set('locale', 'en_US')
 
-  // og:image
-  const og = html.match(/property=["']og:image["'][^>]+content=["']([^"']+)["']/i)
-    ?? html.match(/content=["']([^"']+)["'][^>]+property=["']og:image["']/i)
-  if (og) {
-    const u = og[1].split('?')[0]
-    seen.add(u); images.push(u)
-  }
+  const res = await fetch(url.toString(), {
+    headers: rapidapiHeaders(),
+    signal: AbortSignal.timeout(15000),
+  })
 
-  // alicdn.com CDN URLs embedded in the JS bundle
-  const text = html
-  let idx = 0
-  while (images.length < 8) {
-    const start = text.indexOf('alicdn.com/kf/', idx)
-    if (start === -1) break
-    // walk forward to find end of URL
-    let end = start
-    while (end < text.length && !/[\s"'\\<>]/.test(text[end])) end++
-    const raw = text.slice(start, end)
-    // strip query string and trailing garbage
-    const clean = 'https://' + raw.replace(/\?.*$/, '').replace(/[^a-zA-Z0-9/._%:-].*$/, '')
-    if (/\.(jpg|jpeg|png|webp)$/i.test(clean) && !seen.has(clean)) {
-      seen.add(clean); images.push(clean)
-    }
-    idx = end
-  }
+  if (!res.ok) throw new Error(`item_detail_2 HTTP ${res.status}`)
+  const json = await res.json() as Record<string, unknown>
+  const item = (json?.result as Record<string, unknown>)?.item as Record<string, unknown> | undefined
 
-  return images.slice(0, 6)
+  if (!item) return { title: null, images: [], price_min: null, price_max: null }
+
+  const title = String(item.title ?? '').trim() || null
+
+  const rawImages = (item.images as string[] | undefined) ?? []
+  const images = rawImages.map(u => u.startsWith('//') ? `https:${u}` : u).filter(Boolean).slice(0, 6)
+
+  const skuDef = ((item.sku as Record<string, unknown>)?.def as Record<string, unknown>) ?? {}
+  const priceStr = String(skuDef.promotionPrice ?? skuDef.price ?? '')
+  const nums = priceStr.match(/[\d.]+/g)?.map(Number) ?? []
+  const price_min = nums.length ? Math.min(...nums) : null
+  const price_max = nums.length ? Math.max(...nums) : null
+
+  return { title, images, price_min, price_max }
+}
+
+async function fetchReviews(productId: string): Promise<{
+  rating: number | null
+  review_count: number | null
+}> {
+  const url = new URL(`${RAPIDAPI_BASE}/item_review`)
+  url.searchParams.set('itemId', productId)
+  url.searchParams.set('page', '1')
+
+  const res = await fetch(url.toString(), {
+    headers: rapidapiHeaders(),
+    signal: AbortSignal.timeout(15000),
+  })
+
+  if (!res.ok) return { rating: null, review_count: null }
+  const json = await res.json() as Record<string, unknown>
+  const base = (json?.result as Record<string, unknown>)?.base as Record<string, unknown> | undefined
+
+  if (!base) return { rating: null, review_count: null }
+
+  const stats = base.reviewStats as Record<string, unknown> | undefined
+  const rating = stats?.evarageStar != null ? Number(stats.evarageStar) : null
+  const review_count = base.totalResults != null ? Number(base.totalResults) : null
+
+  return { rating, review_count }
 }
 
 async function fetchProductData(productId: string): Promise<AliProductData> {
-  const url = `https://www.aliexpress.com/item/${productId}.html`
-  const res = await fetch(url, {
-    headers: HEADERS,
-    redirect: 'follow',
-    signal: AbortSignal.timeout(20000),
-  })
-
-  if (!res.ok) throw new Error(`HTTP ${res.status}`)
-  const html = await res.text()
-  if (html.length < 2000) throw new Error(`Página muito curta (${html.length} chars)`)
+  const [detail, reviews] = await Promise.all([
+    fetchDetail(productId),
+    fetchReviews(productId),
+  ])
 
   return {
     product_id: productId,
-    title: extractTitle(html),
-    images: extractImages(html),
-    price_min: null,
-    price_max: null,
-    orders_count: null,
-    rating: null,
-    review_count: null,
+    title: detail.title,
+    images: detail.images,
+    price_min: detail.price_min,
+    price_max: detail.price_max,
+    orders_count: null, // não disponível via RapidAPI DataHub
+    rating: reviews.rating,
+    review_count: reviews.review_count,
     seller_name: null,
     seller_positive_rate: null,
   }
@@ -110,6 +115,10 @@ export async function GET(request: NextRequest) {
   const id = request.nextUrl.searchParams.get('id')
   if (!id || !/^\d+$/.test(id)) {
     return NextResponse.json({ error: 'Valid numeric product id required' }, { status: 400 })
+  }
+
+  if (!process.env.RAPIDAPI_KEY) {
+    return NextResponse.json({ error: 'RAPIDAPI_KEY não configurado' }, { status: 500 })
   }
 
   try {

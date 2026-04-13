@@ -1,0 +1,534 @@
+'use client'
+
+import { useEffect, useState, useCallback } from 'react'
+import { X, ExternalLink, TrendingUp, FlaskConical, Megaphone, Megaphone as CampIcon, ChevronRight, Save, Loader2, AlertCircle } from 'lucide-react'
+import { calcPricing, calcVolumeProjections, fmtEur, fmtPct, DEFAULT_PRICING_CONFIG, type PricingInputs } from '@/lib/pricing'
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+export interface ProductFull {
+  id: string
+  name: string
+  line_category: string | null
+  source_url: string | null
+  mineracao_id: string | null
+  notreglr_score: number | null
+  notreglr_label: string | null
+  notreglr_visual_traits: string[]
+  images: string[]
+  pipeline_status: 'a_testar' | 'testando' | 'validado' | 'descartado'
+  status: string
+  notes: string | null
+  created_at: string
+  // joined
+  product_pricing: PricingRow | null
+  creatives: { id: string }[]
+  ad_campaigns: { id: string; status: string }[]
+}
+
+interface PricingRow {
+  id: string
+  product_id: string
+  cog_eur: number | null
+  freight_eur: number
+  sale_price_eur: number | null
+  coupon_pct: number
+  iof_rate: number
+  checkout_fee_rate: number
+  gateway_fee_rate: number
+  marketing_allocation_pct: number
+  other_taxes_rate: number
+  notes: string | null
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+const PIPELINE_LABELS: Record<string, string> = {
+  a_testar: 'A Testar', testando: 'Testando', validado: 'Validado', descartado: 'Descartado',
+}
+const PIPELINE_COLORS: Record<string, string> = {
+  a_testar: 'var(--text-3)', testando: 'var(--warning)', validado: 'var(--success)', descartado: 'var(--error)',
+}
+
+function scoreColor(score: number | null) {
+  if (score === null) return 'var(--text-4)'
+  if (score >= 70) return 'var(--success)'
+  if (score >= 50) return 'var(--warning)'
+  return 'var(--error)'
+}
+
+function labelBadgeClass(label: string | null) {
+  if (label === 'forte') return 'badge badge-success'
+  if (label === 'medio') return 'badge badge-warning'
+  if (label === 'fraco') return 'badge badge-error'
+  return 'badge badge-neutral'
+}
+
+// ─── Tab: Visão Geral ─────────────────────────────────────────────────────────
+
+function TabGeral({ product }: { product: ProductFull }) {
+  const activeCampaigns = product.ad_campaigns?.filter(c => c.status === 'testando').length ?? 0
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      {/* Imagens */}
+      {product.images?.length > 0 && (
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {product.images.slice(0, 4).map((img, i) => (
+            <img
+              key={i}
+              src={img}
+              alt=""
+              style={{ width: 88, height: 88, objectFit: 'cover', borderRadius: 'var(--radius)', border: '1px solid var(--border)' }}
+              onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* Score + Label */}
+      <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+        {product.notreglr_score !== null && (
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: 36, fontFamily: 'var(--font-alt)', color: scoreColor(product.notreglr_score), lineHeight: 1 }}>
+              {product.notreglr_score}
+            </div>
+            <div style={{ fontSize: 9, color: 'var(--text-4)', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Score</div>
+          </div>
+        )}
+        {product.notreglr_label && (
+          <span className={labelBadgeClass(product.notreglr_label)} style={{ textTransform: 'capitalize' }}>
+            {product.notreglr_label}
+          </span>
+        )}
+        {product.line_category && (
+          <span className="badge badge-neutral">{product.line_category}</span>
+        )}
+      </div>
+
+      {/* Onde está */}
+      <div>
+        <div style={{ fontSize: 10, color: 'var(--text-4)', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 8 }}>
+          Onde está
+        </div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+          {product.mineracao_id && (
+            <ModuleBadge icon={<FlaskConical size={11} />} label="Mineração" color="var(--info)" />
+          )}
+          <ModuleBadge
+            icon={<TrendingUp size={11} />}
+            label={`Esteira: ${PIPELINE_LABELS[product.pipeline_status]}`}
+            color={PIPELINE_COLORS[product.pipeline_status]}
+          />
+          {product.creatives?.length > 0 && (
+            <ModuleBadge icon={<Megaphone size={11} />} label={`Criativos: ${product.creatives.length}`} color="var(--brand)" />
+          )}
+          {product.ad_campaigns?.length > 0 && (
+            <ModuleBadge icon={<CampIcon size={11} />} label={`Campanhas: ${product.ad_campaigns.length}${activeCampaigns > 0 ? ` (${activeCampaigns} ativas)` : ''}`} color="var(--warning)" />
+          )}
+        </div>
+      </div>
+
+      {/* Traits */}
+      {product.notreglr_visual_traits?.length > 0 && (
+        <div>
+          <div style={{ fontSize: 10, color: 'var(--text-4)', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 6 }}>
+            Traits visuais
+          </div>
+          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+            {product.notreglr_visual_traits.map(t => (
+              <span key={t} className="badge badge-neutral" style={{ fontSize: 10 }}>{t}</span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Link fonte */}
+      {product.source_url && (
+        <a href={product.source_url} target="_blank" rel="noopener noreferrer"
+          style={{ display: 'inline-flex', alignItems: 'center', gap: 5, color: 'var(--brand)', fontSize: 12, textDecoration: 'none' }}>
+          <ExternalLink size={12} /> Ver no fornecedor
+        </a>
+      )}
+    </div>
+  )
+}
+
+function ModuleBadge({ icon, label, color }: { icon: React.ReactNode; label: string; color: string }) {
+  return (
+    <span style={{
+      display: 'inline-flex', alignItems: 'center', gap: 5,
+      padding: '3px 8px', borderRadius: 'var(--radius-full)',
+      border: `1px solid ${color}`, color, fontSize: 11,
+      fontFamily: 'var(--font-mono)', letterSpacing: '0.04em',
+    }}>
+      {icon} {label}
+    </span>
+  )
+}
+
+// ─── Tab: Precificação ────────────────────────────────────────────────────────
+
+function TabPrecificacao({ product, onPricingUpdate }: { product: ProductFull; onPricingUpdate: () => void }) {
+  const p = product.product_pricing
+  const [form, setForm] = useState<PricingInputs>({
+    cog_eur: p?.cog_eur ?? null,
+    freight_eur: p?.freight_eur ?? 0,
+    sale_price_eur: p?.sale_price_eur ?? null,
+    coupon_pct: p?.coupon_pct ?? 0,
+    iof_rate: p?.iof_rate ?? DEFAULT_PRICING_CONFIG.iof_rate,
+    checkout_fee_rate: p?.checkout_fee_rate ?? DEFAULT_PRICING_CONFIG.checkout_fee_rate,
+    gateway_fee_rate: p?.gateway_fee_rate ?? DEFAULT_PRICING_CONFIG.gateway_fee_rate,
+    marketing_allocation_pct: p?.marketing_allocation_pct ?? DEFAULT_PRICING_CONFIG.marketing_allocation_pct,
+    other_taxes_rate: p?.other_taxes_rate ?? DEFAULT_PRICING_CONFIG.other_taxes_rate,
+  })
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
+
+  const calc = calcPricing(form)
+  const projections = calc ? calcVolumeProjections(calc) : []
+
+  function num(val: string) { const n = parseFloat(val); return isNaN(n) ? null : n }
+  function pct(val: string) { const n = parseFloat(val); return isNaN(n) ? 0 : n / 100 }
+
+  async function handleSave() {
+    setSaving(true)
+    await fetch('/api/products/pricing', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ product_id: product.id, ...form }),
+    })
+    setSaving(false)
+    setSaved(true)
+    setTimeout(() => setSaved(false), 2000)
+    onPricingUpdate()
+  }
+
+  const inputStyle: React.CSSProperties = {
+    width: '100%', background: 'var(--surface-2)', border: '1px solid var(--border-input)',
+    borderRadius: 'var(--radius-sm)', padding: '6px 10px', color: 'var(--text)',
+    fontSize: 13, fontFamily: 'var(--font)', outline: 'none',
+  }
+  const labelStyle: React.CSSProperties = {
+    fontSize: 10, color: 'var(--text-4)', fontFamily: 'var(--font-mono)',
+    textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 4, display: 'block',
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      {/* Inputs principais */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+        <div>
+          <label style={labelStyle}>COG (custo produto) €</label>
+          <input type="number" step="0.01" min="0" style={inputStyle}
+            value={form.cog_eur ?? ''} onChange={e => setForm(f => ({ ...f, cog_eur: num(e.target.value) }))} placeholder="0.00" />
+        </div>
+        <div>
+          <label style={labelStyle}>Frete €</label>
+          <input type="number" step="0.01" min="0" style={inputStyle}
+            value={form.freight_eur} onChange={e => setForm(f => ({ ...f, freight_eur: num(e.target.value) ?? 0 }))} placeholder="0.00" />
+        </div>
+        <div>
+          <label style={labelStyle}>Preço de venda €</label>
+          <input type="number" step="0.01" min="0" style={inputStyle}
+            value={form.sale_price_eur ?? ''} onChange={e => setForm(f => ({ ...f, sale_price_eur: num(e.target.value) }))} placeholder="0.00" />
+        </div>
+        <div>
+          <label style={labelStyle}>Cupom %</label>
+          <input type="number" step="0.1" min="0" max="100" style={inputStyle}
+            value={(form.coupon_pct * 100).toFixed(1)} onChange={e => setForm(f => ({ ...f, coupon_pct: pct(e.target.value) }))} placeholder="0.0" />
+        </div>
+      </div>
+
+      {/* Taxas — colapsável */}
+      <details style={{ borderRadius: 'var(--radius)', border: '1px solid var(--border)', overflow: 'hidden' }}>
+        <summary style={{ padding: '8px 12px', cursor: 'pointer', fontSize: 11, color: 'var(--text-3)', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '0.1em', userSelect: 'none' }}>
+          Taxas e Alocações (avançado)
+        </summary>
+        <div style={{ padding: '12px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          {[
+            { key: 'iof_rate', label: 'IOF %', default: DEFAULT_PRICING_CONFIG.iof_rate },
+            { key: 'gateway_fee_rate', label: 'Gateway %', default: DEFAULT_PRICING_CONFIG.gateway_fee_rate },
+            { key: 'checkout_fee_rate', label: 'Checkout %', default: DEFAULT_PRICING_CONFIG.checkout_fee_rate },
+            { key: 'marketing_allocation_pct', label: 'Marketing %', default: DEFAULT_PRICING_CONFIG.marketing_allocation_pct },
+          ].map(({ key, label }) => (
+            <div key={key}>
+              <label style={labelStyle}>{label}</label>
+              <input type="number" step="0.01" min="0" max="100" style={inputStyle}
+                value={((form[key as keyof PricingInputs] as number) * 100).toFixed(2)}
+                onChange={e => setForm(f => ({ ...f, [key]: pct(e.target.value) }))}
+              />
+            </div>
+          ))}
+        </div>
+      </details>
+
+      {/* Resultado calculado */}
+      {calc ? (
+        <div style={{ background: 'var(--surface-2)', borderRadius: 'var(--radius)', padding: 16, border: '1px solid var(--border-input)' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 14 }}>
+            <CalcCell label="Lucro líquido" value={fmtEur(calc.netProfit)} color={calc.netProfit > 0 ? 'var(--success)' : 'var(--error)'} />
+            <CalcCell label="Margem" value={fmtPct(calc.profitMarginPct)} color={calc.profitMarginPct > 0.25 ? 'var(--success)' : calc.profitMarginPct > 0 ? 'var(--warning)' : 'var(--error)'} />
+            <CalcCell label="Markup" value={`${calc.markup.toFixed(1)}x`} color="var(--text)" />
+            <CalcCell label="CPA ideal" value={fmtEur(calc.cpaIdeal)} color="var(--info)" />
+            <CalcCell label="CPA máx" value={fmtEur(calc.cpaMax)} color="var(--text-3)" />
+            <CalcCell label="ROAS mín" value={`${calc.roasMin.toFixed(2)}x`} color="var(--brand)" />
+          </div>
+
+          {/* Detalhe de custos */}
+          <div style={{ borderTop: '1px solid var(--border)', paddingTop: 12, display: 'flex', flexDirection: 'column', gap: 4 }}>
+            {[
+              { label: 'Custo total (COG+frete+IOF)', value: fmtEur(calc.totalCost) },
+              { label: 'Gateway', value: fmtEur(calc.gatewayFee) },
+              { label: 'Checkout', value: fmtEur(calc.checkoutFee) },
+              { label: 'Marketing (aloc.)', value: fmtEur(calc.marketingBudget) },
+            ].map(({ label, value }) => (
+              <div key={label} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--text-3)' }}>
+                <span>{label}</span>
+                <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text)' }}>{value}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--text-4)', fontSize: 12 }}>
+          <AlertCircle size={13} /> Preencha COG e preço de venda para ver os cálculos
+        </div>
+      )}
+
+      {/* Projeções de volume */}
+      {projections.length > 0 && (
+        <div>
+          <div style={labelStyle}>Projeção de lucro por volume</div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6 }}>
+            {projections.map(({ units, profit }) => (
+              <div key={units} style={{ background: 'var(--surface-2)', borderRadius: 'var(--radius-sm)', padding: '8px 10px', border: '1px solid var(--border)' }}>
+                <div style={{ fontSize: 9, color: 'var(--text-4)', fontFamily: 'var(--font-mono)', marginBottom: 2 }}>{units.toLocaleString()} un.</div>
+                <div style={{ fontSize: 14, fontFamily: 'var(--font-alt)', color: profit > 0 ? 'var(--success)' : 'var(--error)', lineHeight: 1 }}>
+                  {fmtEur(profit, 0)}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <button onClick={handleSave} disabled={saving} className="btn btn-primary" style={{ alignSelf: 'flex-end' }}>
+        {saving ? <><Loader2 size={13} className="spin" /> Salvando…</> : saved ? '✓ Salvo' : <><Save size={13} /> Salvar precificação</>}
+      </button>
+    </div>
+  )
+}
+
+function CalcCell({ label, value, color }: { label: string; value: string; color: string }) {
+  return (
+    <div>
+      <div style={{ fontSize: 9, color: 'var(--text-4)', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 3 }}>{label}</div>
+      <div style={{ fontSize: 18, fontFamily: 'var(--font-alt)', color, lineHeight: 1 }}>{value}</div>
+    </div>
+  )
+}
+
+// ─── Tab: Esteira ─────────────────────────────────────────────────────────────
+
+function TabEsteira({ product, onUpdate }: { product: ProductFull; onUpdate: () => void }) {
+  const [status, setStatus] = useState(product.pipeline_status)
+  const [saving, setSaving] = useState(false)
+
+  const stages: Array<{ key: string; label: string; color: string }> = [
+    { key: 'a_testar', label: 'A Testar', color: 'var(--text-3)' },
+    { key: 'testando', label: 'Testando', color: 'var(--warning)' },
+    { key: 'validado', label: 'Validado', color: 'var(--success)' },
+    { key: 'descartado', label: 'Descartado', color: 'var(--error)' },
+  ]
+
+  async function handleMove(newStatus: string) {
+    setSaving(true)
+    setStatus(newStatus as typeof status)
+    await fetch('/api/products', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: product.id, pipeline_status: newStatus }),
+    })
+    setSaving(false)
+    onUpdate()
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <div style={{ fontSize: 10, color: 'var(--text-4)', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+        Status atual na esteira
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        {stages.map(({ key, label, color }) => {
+          const isActive = status === key
+          return (
+            <button
+              key={key}
+              onClick={() => handleMove(key)}
+              disabled={saving || isActive}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 10,
+                padding: '10px 14px', borderRadius: 'var(--radius)',
+                border: `1px solid ${isActive ? color : 'var(--border)'}`,
+                background: isActive ? `color-mix(in srgb, ${color} 12%, transparent)` : 'var(--surface-2)',
+                cursor: isActive ? 'default' : 'pointer',
+                textAlign: 'left', transition: 'all 0.15s',
+              }}
+            >
+              <span style={{ width: 7, height: 7, borderRadius: '50%', background: isActive ? color : 'var(--border)', flexShrink: 0 }} />
+              <span style={{ fontSize: 13, color: isActive ? color : 'var(--text-3)', fontWeight: isActive ? 600 : 400 }}>{label}</span>
+              {isActive && <span style={{ marginLeft: 'auto', fontSize: 10, color, fontFamily: 'var(--font-mono)' }}>ATUAL</span>}
+              {!isActive && <ChevronRight size={12} style={{ marginLeft: 'auto', color: 'var(--text-4)' }} />}
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+// ─── Tab: Criativos ───────────────────────────────────────────────────────────
+
+function TabCreatives({ product }: { product: ProductFull }) {
+  if (!product.creatives?.length) {
+    return (
+      <div style={{ color: 'var(--text-4)', fontSize: 13, textAlign: 'center', padding: '24px 0' }}>
+        Nenhum criativo vinculado ainda.
+      </div>
+    )
+  }
+  return (
+    <div style={{ fontSize: 13, color: 'var(--text-3)' }}>
+      {product.creatives.length} criativo(s) vinculado(s).
+      {/* TODO: lista de criativos com detalhes */}
+    </div>
+  )
+}
+
+// ─── Main Drawer ──────────────────────────────────────────────────────────────
+
+type Tab = 'geral' | 'precificacao' | 'esteira' | 'criativos'
+
+interface Props {
+  productId: string | null
+  onClose: () => void
+  onUpdate?: () => void
+}
+
+export function ProductDrawer({ productId, onClose, onUpdate }: Props) {
+  const [product, setProduct] = useState<ProductFull | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [tab, setTab] = useState<Tab>('geral')
+
+  const fetchProduct = useCallback(async () => {
+    if (!productId) return
+    setLoading(true)
+    const res = await fetch('/api/products')
+    const all: ProductFull[] = await res.json()
+    const found = all.find(p => p.id === productId) ?? null
+    setProduct(found)
+    setLoading(false)
+  }, [productId])
+
+  useEffect(() => {
+    if (productId) {
+      setTab('geral')
+      fetchProduct()
+    }
+  }, [productId, fetchProduct])
+
+  // Fechar com Escape
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', h)
+    return () => window.removeEventListener('keydown', h)
+  }, [onClose])
+
+  if (!productId) return null
+
+  const TABS: Array<{ key: Tab; label: string }> = [
+    { key: 'geral', label: 'Visão Geral' },
+    { key: 'precificacao', label: 'Precificação' },
+    { key: 'esteira', label: 'Esteira' },
+    { key: 'criativos', label: 'Criativos' },
+  ]
+
+  return (
+    <>
+      {/* Backdrop */}
+      <div
+        onClick={onClose}
+        style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
+          zIndex: 999, backdropFilter: 'blur(2px)',
+        }}
+      />
+
+      {/* Panel */}
+      <div style={{
+        position: 'fixed', top: 0, right: 0, bottom: 0,
+        width: 480, background: 'var(--surface-panel)',
+        borderLeft: '1px solid var(--border)',
+        zIndex: 1000, display: 'flex', flexDirection: 'column',
+        boxShadow: '-8px 0 32px rgba(0,0,0,0.4)',
+      }}>
+        {/* Header */}
+        <div style={{ padding: '18px 20px 14px', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 12 }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 9, color: 'var(--text-4)', fontFamily: 'var(--font-mono)', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 4 }}>
+                WARD / PRODUTO
+              </div>
+              <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 20, fontWeight: 400, letterSpacing: '0.04em', color: 'var(--text)', margin: 0, lineHeight: 1.2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {loading ? '…' : (product?.name ?? '—')}
+              </h2>
+            </div>
+            <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', padding: 4, marginLeft: 8 }}>
+              <X size={18} />
+            </button>
+          </div>
+
+          {/* Tabs */}
+          <div style={{ display: 'flex', gap: 2 }}>
+            {TABS.map(({ key, label }) => (
+              <button
+                key={key}
+                onClick={() => setTab(key)}
+                style={{
+                  padding: '5px 12px', fontSize: 12, border: 'none', cursor: 'pointer',
+                  borderRadius: 'var(--radius-sm)', fontFamily: 'var(--font)',
+                  background: tab === key ? 'var(--brand-dim)' : 'transparent',
+                  color: tab === key ? 'var(--brand)' : 'var(--text-3)',
+                  fontWeight: tab === key ? 600 : 400,
+                  transition: 'all 0.15s',
+                }}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Content */}
+        <div style={{ flex: 1, overflowY: 'auto', padding: '20px 20px' }}>
+          {loading ? (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 120, color: 'var(--text-4)' }}>
+              <Loader2 size={20} style={{ animation: 'spin 1s linear infinite' }} />
+            </div>
+          ) : product ? (
+            <>
+              {tab === 'geral' && <TabGeral product={product} />}
+              {tab === 'precificacao' && <TabPrecificacao product={product} onPricingUpdate={fetchProduct} />}
+              {tab === 'esteira' && <TabEsteira product={product} onUpdate={() => { fetchProduct(); onUpdate?.() }} />}
+              {tab === 'criativos' && <TabCreatives product={product} />}
+            </>
+          ) : (
+            <div style={{ color: 'var(--text-4)', fontSize: 13 }}>Produto não encontrado.</div>
+          )}
+        </div>
+      </div>
+    </>
+  )
+}

@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
-import { Trash2, ExternalLink, Loader2, Plus, RefreshCw, ImagePlus, X, ChevronDown, LayoutGrid, List, Search, Download, Tag, Check } from 'lucide-react'
+import { Trash2, ExternalLink, Loader2, Plus, RefreshCw, ImagePlus, X, ChevronDown, LayoutGrid, List, Search, Download, Tag, Check, TrendingUp } from 'lucide-react'
 
 // ─── ALIEXPRESS ID EXTRACTOR ─────────────────────────────────────────────────
 
@@ -161,15 +161,18 @@ function StatsBar({ products }: { products: Product[] }) {
 
 // ─── DETAIL MODAL ─────────────────────────────────────────────────────────────
 
-function DetailModal({ product, onClose, onDelete, onImageSubmit }: {
+function DetailModal({ product, onClose, onDelete, onImageSubmit, isPromoted, onPromote }: {
   product: Product
   onClose: () => void
   onDelete: (id: string) => void
   onImageSubmit: (id: string, url: string) => Promise<void>
+  isPromoted: boolean
+  onPromote: (id: string) => Promise<void>
 }) {
   const [imgInput, setImgInput] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [imgErr, setImgErr] = useState(false)
+  const [promoting, setPromoting] = useState(false)
 
   async function handleImg() {
     if (!imgInput.trim()) return
@@ -291,23 +294,44 @@ function DetailModal({ product, onClose, onDelete, onImageSubmit }: {
             )}
 
             {/* Actions */}
-            <div style={{ display: 'flex', gap: 8, marginTop: 'auto' }}>
-              <a
-                href={product.aliexpress_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="btn btn-secondary"
-                style={{ flex: 1, justifyContent: 'center', textDecoration: 'none' }}
-              >
-                <ExternalLink size={12} /> Ver no AliExpress
-              </a>
-              <button
-                onClick={() => { onDelete(product.id); onClose() }}
-                className="btn btn-ghost"
-                style={{ color: 'var(--error)', borderColor: 'rgba(248,113,113,0.25)' }}
-              >
-                <Trash2 size={12} />
-              </button>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 'auto' }}>
+              {/* Enviar para Esteira */}
+              {!isPromoted ? (
+                <button
+                  onClick={async () => { setPromoting(true); await onPromote(product.id); setPromoting(false) }}
+                  disabled={promoting || (product.notreglr_score ?? 0) < 50}
+                  className="btn btn-primary"
+                  style={{ width: '100%', justifyContent: 'center', opacity: (product.notreglr_score ?? 0) < 50 ? 0.5 : 1 }}
+                  title={(product.notreglr_score ?? 0) < 50 ? 'Score mínimo 50 para enviar para esteira' : ''}
+                >
+                  {promoting
+                    ? <><Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} /> Enviando…</>
+                    : <><TrendingUp size={12} /> Enviar para Esteira</>
+                  }
+                </button>
+              ) : (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 12px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--success)', color: 'var(--success)', fontSize: 12 }}>
+                  <TrendingUp size={12} /> Já está na Esteira
+                </div>
+              )}
+              <div style={{ display: 'flex', gap: 8 }}>
+                <a
+                  href={product.aliexpress_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn btn-secondary"
+                  style={{ flex: 1, justifyContent: 'center', textDecoration: 'none' }}
+                >
+                  <ExternalLink size={12} /> Ver no AliExpress
+                </a>
+                <button
+                  onClick={() => { onDelete(product.id); onClose() }}
+                  className="btn btn-ghost"
+                  style={{ color: 'var(--error)', borderColor: 'rgba(248,113,113,0.25)' }}
+                >
+                  <Trash2 size={12} />
+                </button>
+              </div>
             </div>
 
             <span style={{ fontSize: 9, color: 'var(--text-4)', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
@@ -351,11 +375,12 @@ function DetailModal({ product, onClose, onDelete, onImageSubmit }: {
 
 // ─── PRODUCT CARD ─────────────────────────────────────────────────────────────
 
-function ProductCard({ product, onClick, selected, onToggleSelect }: {
+function ProductCard({ product, onClick, selected, onToggleSelect, isPromoted }: {
   product: Product
   onClick: () => void
   selected: boolean
   onToggleSelect: (e: React.MouseEvent) => void
+  isPromoted?: boolean
 }) {
   const [imgErr, setImgErr] = useState(false)
   const [hover, setHover] = useState(false)
@@ -385,10 +410,17 @@ function ProductCard({ product, onClick, selected, onToggleSelect }: {
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         minHeight: 38, flexShrink: 0,
       }}>
-        {product.notreglr_label
-          ? <span className={labelBadgeClass(product.notreglr_label)}>{product.notreglr_label}</span>
-          : <StatusDot status={product.status} />
-        }
+        <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+          {product.notreglr_label
+            ? <span className={labelBadgeClass(product.notreglr_label)}>{product.notreglr_label}</span>
+            : <StatusDot status={product.status} />
+          }
+          {isPromoted && (
+            <span title="Na Esteira" style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 9, color: 'var(--success)', fontFamily: 'var(--font-mono)', letterSpacing: '0.06em' }}>
+              <TrendingUp size={9} /> ESTEIRA
+            </span>
+          )}
+        </div>
         <span style={{ fontWeight: 900, fontSize: 22, color: scoreColor(product.notreglr_score), lineHeight: 1, letterSpacing: -1, fontVariantNumeric: 'tabular-nums' }}>
           {isAnalyzing
             ? <Loader2 size={16} style={{ animation: 'spin 1s linear infinite', color: 'var(--brand)' }} />
@@ -601,6 +633,7 @@ export function MineracaoClient() {
   const [dateTo, setDateTo] = useState('')
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [confirmAction, setConfirmAction] = useState<{ title: string; body: string; onConfirm: () => void } | null>(null)
+  const [promotedIds, setPromotedIds] = useState<Set<string>>(new Set())
 
   const load = useCallback(async () => {
     const res = await fetch('/api/mineracao')
@@ -608,7 +641,16 @@ export function MineracaoClient() {
     setLoading(false)
   }, [])
 
-  useEffect(() => { load() }, [load])
+  const loadPromoted = useCallback(async () => {
+    try {
+      const res = await fetch('/api/products')
+      if (!res.ok) return
+      const data: { mineracao_id: string | null }[] = await res.json()
+      setPromotedIds(new Set(data.map(p => p.mineracao_id).filter(Boolean) as string[]))
+    } catch { /* silent */ }
+  }, [])
+
+  useEffect(() => { load(); loadPromoted() }, [load, loadPromoted])
 
   useEffect(() => {
     const hasAnalyzing = products.some(p => p.status === 'analyzing' || p.status === 'pending')
@@ -779,6 +821,17 @@ export function MineracaoClient() {
       setAnalyzing(false)
       setAnalyzeProgress(null)
       setSelectedIds(new Set())
+    }
+  }
+
+  async function handlePromote(mineracaoId: string) {
+    const res = await fetch('/api/products/promote', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mineracao_id: mineracaoId }),
+    })
+    if (res.ok) {
+      setPromotedIds(prev => new Set([...prev, mineracaoId]))
     }
   }
 
@@ -1133,6 +1186,7 @@ export function MineracaoClient() {
               selected={selectedIds.has(p.id)}
               onToggleSelect={e => toggleSelect(e, p.id)}
               onClick={() => handleCardClick(p)}
+              isPromoted={promotedIds.has(p.id)}
             />
           ))}
         </div>
@@ -1169,6 +1223,8 @@ export function MineracaoClient() {
           onClose={() => setSelected(null)}
           onDelete={handleDelete}
           onImageSubmit={handleImageSubmit}
+          isPromoted={promotedIds.has(selected.id)}
+          onPromote={handlePromote}
         />
       )}
 
