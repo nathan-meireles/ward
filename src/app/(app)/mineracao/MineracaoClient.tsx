@@ -308,10 +308,9 @@ function DetailModal({ product, onClose, onDelete, onImageSubmit, isPromoted, on
               {!isPromoted ? (
                 <button
                   onClick={async () => { setPromoting(true); await onPromote(product.id); setPromoting(false) }}
-                  disabled={promoting || (product.notreglr_score ?? 0) < 50}
+                  disabled={promoting}
                   className="btn btn-primary"
-                  style={{ width: '100%', justifyContent: 'center', opacity: (product.notreglr_score ?? 0) < 50 ? 0.5 : 1 }}
-                  title={(product.notreglr_score ?? 0) < 50 ? 'Score mínimo 50 para enviar para esteira' : ''}
+                  style={{ width: '100%', justifyContent: 'center' }}
                 >
                   {promoting
                     ? <><Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} /> Enviando…</>
@@ -855,7 +854,7 @@ export function MineracaoClient() {
     const ids = Array.from(selectedIds)
     const eligible = ids.filter(id => {
       const p = products.find(p => p.id === id)
-      return p && (p.notreglr_score ?? 0) >= 50 && !promotedIds.has(p.id)
+      return p && !promotedIds.has(p.id)
     })
     if (!eligible.length) return
     setPromotingBulk(true)
