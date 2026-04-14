@@ -127,8 +127,7 @@ export async function GET(request: NextRequest) {
 
     if (images.length === 0) {
       return NextResponse.json(
-        { error: 'Não foi possível obter imagens. Cole a URL da imagem manualmente.' },
-        { status: 502 }
+        { error: 'Não foi possível obter imagens. Cole a URL da imagem manualmente.' }
       )
     }
 
@@ -147,6 +146,6 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(result)
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err)
-    return NextResponse.json({ error: msg }, { status: 502 })
+    return NextResponse.json({ error: msg })
   }
 }

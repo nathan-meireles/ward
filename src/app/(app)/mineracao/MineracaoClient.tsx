@@ -715,16 +715,11 @@ export function MineracaoClient() {
 
         try {
           const apiRes = await fetch(`/api/mineracao/product?id=${productId}`)
-          const ct = apiRes.headers.get('content-type') ?? ''
-          if (!ct.includes('application/json')) {
-            payload.fetchError = `Erro ${apiRes.status}: resposta inesperada do servidor`
+          const data = await apiRes.json()
+          if (!data.error) {
+            payload = { ...payload, ...data }
           } else {
-            const data = await apiRes.json()
-            if (!data.error) {
-              payload = { ...payload, ...data }
-            } else {
-              payload.fetchError = data.error
-            }
+            payload.fetchError = data.error
           }
         } catch (e) {
           payload.fetchError = 'Erro ao buscar dados do produto'
@@ -816,16 +811,11 @@ export function MineracaoClient() {
 
         try {
           const apiRes = await fetch(`/api/mineracao/product?id=${productId}`)
-          const ct = apiRes.headers.get('content-type') ?? ''
-          if (!ct.includes('application/json')) {
-            payload.fetchError = `Erro ${apiRes.status}: resposta inesperada do servidor`
+          const data = await apiRes.json()
+          if (!data.error) {
+            payload = { ...payload, ...data }
           } else {
-            const data = await apiRes.json()
-            if (!data.error) {
-              payload = { ...payload, ...data }
-            } else {
-              payload.fetchError = data.error
-            }
+            payload.fetchError = data.error
           }
         } catch (e) {
           payload.fetchError = 'Erro ao buscar dados do produto'
