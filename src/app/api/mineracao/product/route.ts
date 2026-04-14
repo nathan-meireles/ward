@@ -35,37 +35,34 @@ async function fetchProductImages(productId: string): Promise<string[]> {
   }
 
   // Extrair URLs de imagem do CDN AliExpress
-  const cdnUrls = new Set<string>()
+  // Captura qualquer variação: https://, // ou sem protocolo
+  const seen = new Set<string>()
 
-  // Padrão 1: URLs no formato ae01.alicdn.com/kf/ (principal)
-  const aliCdnRegex = /https?:\/\/ae\d+\.alicdn\.com\/kf\/[A-Za-z0-9_\-.]+\.(?:jpg|jpeg|png|webp)/gi
-  const cdnMatches = html.matchAll(aliCdnRegex)
-  for (const m of cdnMatches) {
-    const url = m[0].replace(/\\\//g, '/').split('_')[0]
-    cdnUrls.add(url.endsWith('.jpg') || url.endsWith('.jpeg') || url.endsWith('.png') || url.endsWith('.webp')
-      ? url
-      : m[0])
-    if (cdnUrls.size >= 6) break
+  // Regex amplo: captura o path ae\d+.alicdn.com/kf/HASH.ext independente do protocolo
+  const cdnRegex = /(?:https?:)?\/\/?(ae\d+\.alicdn\.com\/kf\/[A-Za-z0-9_.%-]+\.(?:jpg|jpeg|png|webp))/gi
+  for (const m of html.matchAll(cdnRegex)) {
+    const normalized = `https://${m[1]}`
+    seen.add(normalized)
+    if (seen.size >= 6) break
   }
 
-  // Padrão 2: URLs escapadas tipo ae01.alicdn.com\/kf\/
-  if (cdnUrls.size < 2) {
-    const escapedRegex = /https?:\\\/\\\/ae\d+\.alicdn\.com\\\/kf\\\/[^"'\\]+/gi
-    const escaped = html.matchAll(escapedRegex)
-    for (const m of escaped) {
-      cdnUrls.add(m[0].replace(/\\\//g, '/'))
-      if (cdnUrls.size >= 6) break
+  // Padrão escapado: ae01.alicdn.com\/kf\/HASH.jpg (dentro de JSON strings)
+  if (seen.size < 2) {
+    const escapedRegex = /ae\d+\.alicdn\.com\\\/kf\\\/([A-Za-z0-9_.%-]+\.(?:jpg|jpeg|png|webp))/gi
+    for (const m of html.matchAll(escapedRegex)) {
+      seen.add(`https://ae01.alicdn.com/kf/${m[1]}`)
+      if (seen.size >= 6) break
     }
   }
 
-  // Padrão 3: og:image como fallback
-  if (cdnUrls.size === 0) {
-    const ogMatch = html.match(/<meta[^>]+property="og:image"[^>]+content="([^"]+)"/)
-    if (ogMatch) cdnUrls.add(ogMatch[1])
+  // Fallback og:image
+  if (seen.size === 0) {
+    const ogMatch = html.match(/property="og:image"\s+content="([^"]+)"/) ||
+                    html.match(/content="([^"]+)"\s+property="og:image"/)
+    if (ogMatch?.[1]) seen.add(ogMatch[1])
   }
 
-  const images = Array.from(cdnUrls)
-    .map(u => u.startsWith('//') ? `https:${u}` : u)
+  const images = Array.from(seen)
     .filter(u => u.includes('alicdn.com'))
     .slice(0, 4)
 
