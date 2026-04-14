@@ -11,7 +11,10 @@ const CF_WORKER = 'https://ali-proxy.nathan-meireles.workers.dev'
 function extractImages(html: string): string[] {
   const seen = new Set<string>()
 
-  if (html.length < 5000) return []
+  if (html.length < 5000) {
+    // Página muito curta = bot detection ou produto removido/restrito no AliExpress
+    throw new Error(`Produto indisponível ou restrito (resposta: ${html.length} chars). Verifique se o link ainda existe no AliExpress.`)
+  }
 
   let pos = html.indexOf('alicdn.com/kf/')
   while (pos !== -1 && seen.size < 5) {
@@ -65,7 +68,7 @@ export async function GET(request: NextRequest) {
     const images = await fetchViaWorker(id)
 
     if (images.length === 0) {
-      return NextResponse.json({ error: 'Nenhuma imagem encontrada para este produto' })
+      return NextResponse.json({ error: 'Nenhuma imagem extraída. O produto pode estar com URL diferente no AliExpress — tente copiar a URL diretamente da página do produto.' })
     }
 
     const result: AliProductData = {

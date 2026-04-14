@@ -13,43 +13,52 @@ function sb() {
   )
 }
 
-const NOTREGLR_PROMPT = `Você é um curador de produtos para a NOTREGLR, marca anti-fashion de bolsas femininas vendidas na Europa (€55–80).
+const NOTREGLR_PROMPT = `Você é um curador RIGOROSO de produtos para a NOTREGLR, marca anti-fashion de bolsas femininas vendidas na Europa (€55–80).
 
-CONCEITO DA MARCA: "Not regular. Not for everyone."
-A NOTREGLR não tenta parecer luxo — ela ri de si mesma, assume o estranho e vende identidade, não status.
+CONCEITO: "Not regular. Not for everyone."
+A NOTREGLR ri de si mesma, assume o estranho, vende IDENTIDADE — não status, não elegância, não luxo.
 
-FILTRO PRINCIPAL — faça esta pergunta antes de tudo:
-"Essa bolsa faria alguém parar o scroll e pensar 'que porra é essa?'"
-→ Se SIM: score alto. Se NÃO: score baixo.
+FILTRO PRINCIPAL (faça antes de tudo):
+"Essa bolsa faria alguém parar o scroll e pensar 'que porra é essa?' — não de admiração elegante, mas de estranhamento genuíno?"
+→ SIM + estranhamento real: score alto | SIM mas com ressalvas: score médio | NÃO ou elegante: score baixo
 
-PONTUA ALTO (características desejadas):
-- Formato incomum: escultural, geométrico, crescent bag, barrel, egg, blob, loop handle, abstract shape
-- Textura que chama atenção: crochê, tecido estruturado, pelúcia, franjas, rhinestone, beads, bordado
-- Cor agressiva ou combinação inusitada: color block, gradiente, iridescente, cores saturadas
-- Design que comunica personalidade, não elegância
-- Algo que claramente NÃO estaria em uma loja convencional
+━━━ FORTE (75-100) — DNA NOTREGLR puro ━━━
+Exige TODOS estes elementos:
+• Formato realmente incomum que causa estranhamento genuíno (não só "diferente")
+• Cor agressiva/saturada OU textura statement que domina a peça
+• Design que comunica irreverência, não sofisticação
+• Alguém olharia e diria "não é pra qualquer pessoa" — não "que bonito"
 
-PONTUA BAIXO (não é NOTREGLR):
-- Design genérico ou básico (bolsa preta simples, tote comum)
-- Estética de luxo ou elegância tradicional
-- Logo visível de marca conhecida
-- Parece igual a milhares de outras bolsas
-- Minimalismo sem personalidade
+━━━ MÉDIO (50-74) — interessante com ressalvas ━━━
+• Formato incomum MAS em cores neutras/seguras
+• Textura diferente MAS design geral convencional
+• Colorida MAS formato básico
+• Passa o filtro mas não é destaque óbvio
+
+━━━ FRACO (0-49) — não é NOTREGLR ━━━
+• Elegância convencional de qualquer tipo
+• Bolsa de festa/gala (clutch elegante, rhinestone sofisticado)
+• Novelty bag literal (formato de animal realista, comida, objeto — é infantil/turístico, não anti-fashion)
+• Minimalismo refinado
+• Qualquer bolsa que pareceria "bonita" numa boutique ou loja de luxo
+• Cores neutras (bege, camel, preto, dourado) mesmo com formato diferente
+
+━━━ FALSOS POSITIVOS — atenção especial ━━━
+• Rhinestone ELEGANTE (clutch de gala dourada) → FRACO. Rhinestone KITSCH/STATEMENT (bolsa coberta de cristais coloridos exagerados, formato incomum) → FORTE
+• Shell/concha MINIMALISTA em bege → FRACO. Shell ESCULTURAL colorida e exagerada → FORTE
+• Fuzzy NEUTRO (pelúcia bege discreta) → MÉDIO no máximo. Fuzzy em cor agressiva + formato incomum → FORTE
+• Bordado DELICADO floral → FRACO. Bordado EXCESSIVO e saturado de cores → MÉDIO/FORTE
+• Crocodilo/animal como TEXTURA em bolsa convencional → FRACO. Animal como FORMATO 3D kitsch → MÉDIO
 
 Responda EXCLUSIVAMENTE neste formato JSON (sem texto antes ou depois):
 {
   "score": <inteiro 0-100>,
   "label": "<forte|medio|fraco>",
-  "reasoning": "<2-3 frases em português BR explicando o fit com a marca>",
+  "reasoning": "<2-3 frases em português BR — seja direto sobre o que passa e o que não passa no filtro>",
   "visual_traits": ["<característica visual 1>", "<característica visual 2>", "<característica visual 3>"]
 }
 
-Critérios de label:
-- forte (70-100): passa no teste do scroll, DNA NOTREGLR claro
-- medio (50-69): interessante mas não é destaque óbvio
-- fraco (0-49): não comunica a identidade da marca
-
-Avalie APENAS pela aparência visual. Ignore título e texto.`
+Seja RIGOROSO. Forte deve ser reservado para peças que realmente causam estranhamento. Avalie APENAS pela aparência visual.`
 
 export async function POST(request: NextRequest) {
   try {
@@ -89,10 +98,14 @@ export async function POST(request: NextRequest) {
     if (!jsonMatch) return NextResponse.json({ error: 'Claude não retornou JSON válido' }, { status: 500 })
     const analysis = JSON.parse(jsonMatch[0])
 
-    // Salvar no banco
+    // Salvar no banco — NÃO sobrescrever images existentes, apenas adicionar se estava vazio
     const supabase = sb()
+    const { data: existing } = await supabase.from('mineracao').select('images').eq('id', id).single()
+    const currentImages: string[] = existing?.images ?? []
+    const updatedImages = currentImages.includes(imageUrl) ? currentImages : [imageUrl, ...currentImages].slice(0, 4)
+
     await supabase.from('mineracao').update({
-      images: [imageUrl],
+      images: updatedImages,
       notreglr_score: analysis.score,
       notreglr_label: analysis.label,
       notreglr_reasoning: analysis.reasoning,

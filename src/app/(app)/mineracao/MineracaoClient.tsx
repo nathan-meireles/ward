@@ -39,6 +39,7 @@ function ConfirmModal({ title, body, confirmLabel = 'Confirmar', onConfirm, onCa
 
 interface Product {
   id: string
+  seq_num: number | null
   aliexpress_id: string | null
   aliexpress_url: string
   title: string | null
@@ -57,6 +58,11 @@ interface Product {
   status: string
   error_msg: string | null
   created_at: string
+}
+
+function productCode(p: Product): string {
+  if (!p.seq_num) return '—'
+  return `NTR-${String(p.seq_num).padStart(3, '0')}`
 }
 
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
@@ -198,6 +204,9 @@ function DetailModal({ product, onClose, onDelete, onImageSubmit, isPromoted, on
         {/* Header */}
         <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+            <span style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-4)', letterSpacing: '0.1em', flexShrink: 0 }}>
+              {productCode(product)}
+            </span>
             {product.notreglr_label && (
               <span className={labelBadgeClass(product.notreglr_label)}>{product.notreglr_label}</span>
             )}
@@ -411,6 +420,9 @@ function ProductCard({ product, onClick, selected, onToggleSelect, isPromoted }:
         minHeight: 38, flexShrink: 0,
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+          <span style={{ fontSize: 9, fontFamily: 'var(--font-mono)', color: 'var(--text-4)', letterSpacing: '0.08em', flexShrink: 0 }}>
+            {productCode(product)}
+          </span>
           {product.notreglr_label
             ? <span className={labelBadgeClass(product.notreglr_label)}>{product.notreglr_label}</span>
             : <StatusDot status={product.status} />
@@ -551,7 +563,8 @@ function ListRow({ product, onClick, selected, onToggleSelect }: {
         ) : null}
       </div>
 
-      <div style={{ minWidth: 0 }}>
+      <div style={{ minWidth: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+        <span style={{ fontSize: 9, fontFamily: 'var(--font-mono)', color: 'var(--text-4)', letterSpacing: '0.08em', flexShrink: 0 }}>{productCode(product)}</span>
         <span style={{ fontSize: 12, color: 'var(--text-2)', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis', display: 'block' }}>
           {cleanTitle(product.title, 'Produto AliExpress')}
         </span>
