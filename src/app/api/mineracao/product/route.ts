@@ -36,8 +36,8 @@ async function fetchDetail(productId: string): Promise<{
 }> {
   const url = new URL(`${RAPIDAPI_BASE}/item_detail_2`)
   url.searchParams.set('itemId', productId)
-  url.searchParams.set('currency', 'EUR')
-  url.searchParams.set('region', 'NL')
+  url.searchParams.set('currency', 'USD')
+  url.searchParams.set('region', 'US')
   url.searchParams.set('locale', 'en_US')
 
   const res = await fetch(url.toString(), {
