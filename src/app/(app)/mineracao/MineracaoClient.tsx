@@ -715,14 +715,19 @@ export function MineracaoClient() {
 
         try {
           const apiRes = await fetch(`/api/mineracao/product?id=${productId}`)
-          const data = await apiRes.json()
-          if (!data.error) {
-            payload = { ...payload, ...data }
+          const ct = apiRes.headers.get('content-type') ?? ''
+          if (!ct.includes('application/json')) {
+            payload.fetchError = `Erro ${apiRes.status}: resposta inesperada do servidor`
           } else {
-            payload.fetchError = data.error
+            const data = await apiRes.json()
+            if (!data.error) {
+              payload = { ...payload, ...data }
+            } else {
+              payload.fetchError = data.error
+            }
           }
         } catch (e) {
-          payload.fetchError = e instanceof Error ? e.message : 'Erro de fetch'
+          payload.fetchError = 'Erro ao buscar dados do produto'
         }
 
         try {
@@ -811,14 +816,19 @@ export function MineracaoClient() {
 
         try {
           const apiRes = await fetch(`/api/mineracao/product?id=${productId}`)
-          const data = await apiRes.json()
-          if (!data.error) {
-            payload = { ...payload, ...data }
+          const ct = apiRes.headers.get('content-type') ?? ''
+          if (!ct.includes('application/json')) {
+            payload.fetchError = `Erro ${apiRes.status}: resposta inesperada do servidor`
           } else {
-            payload.fetchError = data.error
+            const data = await apiRes.json()
+            if (!data.error) {
+              payload = { ...payload, ...data }
+            } else {
+              payload.fetchError = data.error
+            }
           }
         } catch (e) {
-          payload.fetchError = e instanceof Error ? e.message : 'Erro de fetch'
+          payload.fetchError = 'Erro ao buscar dados do produto'
         }
 
         try {
