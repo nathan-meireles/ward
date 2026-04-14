@@ -20,6 +20,14 @@ export interface ProductFull {
   status: string
   notes: string | null
   created_at: string
+  // conteúdo gerado
+  product_name: string | null
+  hook: string | null
+  features: string[] | null
+  shopify_tags: string[] | null
+  line_name: string | null
+  content_status: string | null
+  fold2_image_url: string | null
   // joined
   product_pricing: PricingRow | null
   creatives: { id: string }[]
@@ -407,9 +415,179 @@ function TabCreatives({ product }: { product: ProductFull }) {
   )
 }
 
+// ─── Tab: Conteúdo ────────────────────────────────────────────────────────────
+
+const CONTENT_STATUS_LABEL: Record<string, string> = {
+  pending: 'Aguardando geração',
+  generating: 'Gerando…',
+  done: 'Gerado',
+  error: 'Erro na geração',
+}
+
+function TabConteudo({ product, onUpdate }: { product: ProductFull; onUpdate: () => void }) {
+  const [rawText, setRawText] = useState('')
+  const [generating, setGenerating] = useState(false)
+  const [err, setErr] = useState('')
+  const [editing, setEditing] = useState<Partial<{
+    product_name: string; hook: string; features: string; shopify_tags: string; line_name: string; fold2_image_url: string
+  }>>({})
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
+
+  const isDone = product.content_status === 'done'
+
+  async function generate() {
+    if (!rawText.trim()) { setErr('Cole o texto da página do AliExpress antes de gerar.'); return }
+    setErr(''); setGenerating(true)
+    const res = await fetch('/api/products/generate-content', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ product_id: product.id, raw_page_content: rawText }),
+    })
+    setGenerating(false)
+    if (!res.ok) { const d = await res.json(); setErr(d.error ?? 'Erro'); return }
+    setEditing({})
+    onUpdate()
+  }
+
+  async function save() {
+    setSaving(true)
+    const updates: Record<string, unknown> = {}
+    if (editing.product_name !== undefined) updates.product_name = editing.product_name
+    if (editing.hook !== undefined) updates.hook = editing.hook
+    if (editing.features !== undefined) updates.features = editing.features.split('\n').map(s => s.replace(/^[•\-]\s*/, '').trim()).filter(Boolean)
+    if (editing.shopify_tags !== undefined) updates.shopify_tags = editing.shopify_tags.split(',').map(s => s.trim().toLowerCase()).filter(Boolean)
+    if (editing.line_name !== undefined) updates.line_name = editing.line_name
+    if (editing.fold2_image_url !== undefined) updates.fold2_image_url = editing.fold2_image_url
+    await fetch('/api/products', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: product.id, ...updates }) })
+    setSaving(false); setSaved(true); setTimeout(() => setSaved(false), 2000)
+    onUpdate()
+  }
+
+  const currentFeatures = editing.features ?? (product.features ?? []).join('\n')
+  const currentTags = editing.shopify_tags ?? (product.shopify_tags ?? []).join(', ')
+  const hasEdits = Object.keys(editing).length > 0
+
+  const fieldStyle = {
+    width: '100%', background: 'var(--surface-2)', border: '1px solid var(--border-input)',
+    borderRadius: 'var(--radius-sm)', color: 'var(--text)', fontSize: 13,
+    padding: '8px 10px', fontFamily: 'var(--font)', resize: 'vertical' as const,
+    outline: 'none', lineHeight: 1.5,
+  }
+  const labelStyle = { fontSize: 9, color: 'var(--text-4)', fontFamily: 'var(--font-mono)', letterSpacing: '0.12em', textTransform: 'uppercase' as const, marginBottom: 5, display: 'block' }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+
+      {/* Status + geração */}
+      <div style={{ background: 'var(--surface-2)', borderRadius: 'var(--radius)', padding: 14, border: '1px solid var(--border)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: isDone ? 12 : 0 }}>
+          <span style={{ fontSize: 11, color: isDone ? 'var(--success)' : 'var(--text-4)', fontFamily: 'var(--font-mono)' }}>
+            {CONTENT_STATUS_LABEL[product.content_status ?? 'pending'] ?? 'Pendente'}
+          </span>
+          {isDone && (
+            <button onClick={() => setRawText('')} className="btn btn-ghost" style={{ fontSize: 11, padding: '2px 8px' }}>
+              Regerar
+            </button>
+          )}
+        </div>
+        {(!isDone || rawText) && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <label style={labelStyle}>Texto da página do AliExpress</label>
+            <textarea
+              value={rawText}
+              onChange={e => setRawText(e.target.value)}
+              placeholder={'Cole aqui o texto completo da página do produto no AliExpress.\nInclua: título, specs, materiais, dimensões, descrição do fornecedor.'}
+              style={{ ...fieldStyle, minHeight: 120 }}
+            />
+            {err && <span style={{ fontSize: 11, color: 'var(--error)' }}>{err}</span>}
+            <button onClick={generate} disabled={generating} className="btn btn-primary" style={{ justifyContent: 'center' }}>
+              {generating ? <><Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} /> Gerando…</> : 'Gerar com Claude'}
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Campos gerados — editáveis */}
+      {isDone && !rawText && (
+        <>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <label style={labelStyle}>Nome do Produto</label>
+            <input
+              value={editing.product_name ?? product.product_name ?? ''}
+              onChange={e => setEditing(p => ({ ...p, product_name: e.target.value }))}
+              style={{ ...fieldStyle, resize: undefined }}
+              placeholder="Ex: The Amsterdam Intruder"
+            />
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <label style={labelStyle}>Hook (1 frase)</label>
+            <input
+              value={editing.hook ?? product.hook ?? ''}
+              onChange={e => setEditing(p => ({ ...p, hook: e.target.value }))}
+              style={{ ...fieldStyle, resize: undefined }}
+              placeholder="Ex: For people who stopped explaining their taste."
+            />
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <label style={labelStyle}>Features (1 por linha)</label>
+            <textarea
+              value={currentFeatures}
+              onChange={e => setEditing(p => ({ ...p, features: e.target.value }))}
+              style={{ ...fieldStyle, minHeight: 100 }}
+              placeholder={'Holds your phone, keys, cards, and one bad decision\nMagnetic closure\n...'}
+            />
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <label style={labelStyle}>Linha</label>
+            <select
+              value={editing.line_name ?? product.line_name ?? ''}
+              onChange={e => setEditing(p => ({ ...p, line_name: e.target.value }))}
+              style={{ ...fieldStyle, resize: undefined }}
+            >
+              {['Wrong Shapes','The Furred','Color Riot','Not Your Garden','Shell Shocked','The Excessive'].map(l => (
+                <option key={l} value={l}>{l}</option>
+              ))}
+            </select>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <label style={labelStyle}>Shopify Tags (separadas por vírgula)</label>
+            <input
+              value={currentTags}
+              onChange={e => setEditing(p => ({ ...p, shopify_tags: e.target.value }))}
+              style={{ ...fieldStyle, resize: undefined }}
+              placeholder="sculptural, bold-color, wrong-shapes, crossbody"
+            />
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <label style={labelStyle}>Imagem Segunda Dobra (URL)</label>
+            <input
+              value={editing.fold2_image_url ?? product.fold2_image_url ?? ''}
+              onChange={e => setEditing(p => ({ ...p, fold2_image_url: e.target.value }))}
+              style={{ ...fieldStyle, resize: undefined }}
+              placeholder="https://..."
+            />
+          </div>
+
+          {hasEdits && (
+            <button onClick={save} disabled={saving} className="btn btn-primary" style={{ justifyContent: 'center' }}>
+              {saving ? <><Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} /> Salvando…</> : saved ? '✓ Salvo' : 'Salvar alterações'}
+            </button>
+          )}
+        </>
+      )}
+    </div>
+  )
+}
+
 // ─── Main Drawer ──────────────────────────────────────────────────────────────
 
-type Tab = 'geral' | 'precificacao' | 'esteira' | 'criativos'
+type Tab = 'geral' | 'precificacao' | 'esteira' | 'criativos' | 'conteudo'
 
 interface Props {
   productId: string | null
@@ -450,6 +628,7 @@ export function ProductDrawer({ productId, onClose, onUpdate }: Props) {
 
   const TABS: Array<{ key: Tab; label: string }> = [
     { key: 'geral', label: 'Visão Geral' },
+    { key: 'conteudo', label: 'Conteúdo' },
     { key: 'precificacao', label: 'Precificação' },
     { key: 'esteira', label: 'Esteira' },
     { key: 'criativos', label: 'Criativos' },
@@ -520,6 +699,7 @@ export function ProductDrawer({ productId, onClose, onUpdate }: Props) {
           ) : product ? (
             <>
               {tab === 'geral' && <TabGeral product={product} />}
+              {tab === 'conteudo' && <TabConteudo product={product} onUpdate={fetchProduct} />}
               {tab === 'precificacao' && <TabPrecificacao product={product} onPricingUpdate={fetchProduct} />}
               {tab === 'esteira' && <TabEsteira product={product} onUpdate={() => { fetchProduct(); onUpdate?.() }} />}
               {tab === 'criativos' && <TabCreatives product={product} />}

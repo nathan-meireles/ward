@@ -1,7 +1,8 @@
 /**
  * POST /api/products/promote
- * Promove um produto da tabela mineracao para a tabela products (esteira).
- * Se já existe um produto com esse mineracao_id, retorna o existente.
+ * Promove produto da mineracao para products (esteira).
+ * Conteúdo (product_name, hook, features etc.) é gerado separadamente
+ * via POST /api/products/generate-content após o usuário colar o texto do AliExpress.
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
@@ -23,10 +24,10 @@ export async function POST(request: NextRequest) {
 
   const supabase = sb()
 
-  // Verifica se já existe
+  // Já existe na esteira?
   const { data: existing } = await supabase
     .from('products')
-    .select('id, pipeline_status')
+    .select('id, pipeline_status, content_status, product_name')
     .eq('mineracao_id', mineracao_id)
     .maybeSingle()
 
@@ -35,40 +36,41 @@ export async function POST(request: NextRequest) {
   }
 
   // Busca dados da mineração
-  const { data: mineracao, error: mErr } = await supabase
+  const { data: m, error: mErr } = await supabase
     .from('mineracao')
     .select('*')
     .eq('id', mineracao_id)
     .single()
 
-  if (mErr || !mineracao) {
+  if (mErr || !m) {
     return NextResponse.json({ error: 'Produto não encontrado na mineração' }, { status: 404 })
   }
 
-  // Cria o produto
+  // Cria o produto — conteúdo será gerado depois pelo usuário
   const { data: product, error: pErr } = await supabase
     .from('products')
     .insert({
       project_id: 'notreglr',
-      name: mineracao.title ?? `Produto ${mineracao.aliexpress_id ?? mineracao_id.slice(0, 8)}`,
-      source_url: mineracao.aliexpress_url ?? null,
-      mineracao_id: mineracao_id,
-      notreglr_score: mineracao.notreglr_score ?? null,
-      notreglr_label: mineracao.notreglr_label ?? null,
-      notreglr_visual_traits: mineracao.notreglr_visual_traits ?? [],
-      images: mineracao.images ?? [],
+      name: m.title ?? `Produto ${m.aliexpress_id ?? mineracao_id.slice(0, 8)}`,
+      source_url: m.aliexpress_url ?? null,
+      mineracao_id,
+      notreglr_score: m.notreglr_score ?? null,
+      notreglr_label: m.notreglr_label ?? null,
+      notreglr_visual_traits: m.notreglr_visual_traits ?? [],
+      images: m.images ?? [],
       pipeline_status: 'a_testar',
       status: 'evaluating',
+      content_status: 'pending',
     })
     .select()
     .single()
 
   if (pErr) return NextResponse.json({ error: pErr.message }, { status: 500 })
 
-  // Cria pricing vazio com valores padrão
+  // Cria pricing vazio com COG inicial
   await supabase.from('product_pricing').insert({
     product_id: product.id,
-    cog_eur: mineracao.price_min ?? null,
+    cog_eur: m.price_min ?? null,
   })
 
   return NextResponse.json({ product, already_exists: false }, { status: 201 })
