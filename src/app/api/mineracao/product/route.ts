@@ -60,7 +60,8 @@ async function scrapeAliExpress(productId: string): Promise<string[]> {
 // ─── Fallback: RapidAPI com region=US ────────────────────────────────────────
 
 async function rapidapiImages(productId: string): Promise<string[]> {
-  const key = process.env.RAPIDAPI_KEY
+  // Fallback key para quando RAPIDAPI_KEY não estiver no Vercel env
+  const key = process.env.RAPIDAPI_KEY ?? '9e909bcb58mshe126fee0ef84a5cp1ca40ejsn72eec7b249a5'
   if (!key) return []
 
   const url = new URL('https://aliexpress-datahub.p.rapidapi.com/item_detail_2')
