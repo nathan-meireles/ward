@@ -1,77 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-// ─── Fetch AliExpress product images directly ─────────────────────────────────
-// Sem RapidAPI — scraping direto do HTML da página do produto.
-// Extrai URLs ae01.alicdn.com que são públicas e não exigem auth.
-
-const HEADERS = {
-  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-  'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
-  'Accept-Language': 'en-US,en;q=0.9',
-  'Accept-Encoding': 'gzip, deflate, br',
-  'Cache-Control': 'no-cache',
-  'Pragma': 'no-cache',
-  'Sec-Fetch-Dest': 'document',
-  'Sec-Fetch-Mode': 'navigate',
-  'Sec-Fetch-Site': 'none',
-  'Upgrade-Insecure-Requests': '1',
-}
-
-async function fetchProductImages(productId: string): Promise<string[]> {
-  const url = `https://www.aliexpress.com/item/${productId}.html`
-
-  const res = await fetch(url, {
-    headers: HEADERS,
-    redirect: 'follow',
-    signal: AbortSignal.timeout(20000),
-  })
-
-  if (!res.ok) throw new Error(`HTTP ${res.status}`)
-
-  const html = await res.text()
-
-  if (html.length < 3000) {
-    throw new Error(`HTML muito curto (${html.length} chars) — possível bot detection`)
-  }
-
-  // Extrair URLs de imagem do CDN AliExpress
-  // Captura qualquer variação: https://, // ou sem protocolo
-  const seen = new Set<string>()
-
-  // Regex amplo: captura o path ae\d+.alicdn.com/kf/HASH.ext independente do protocolo
-  const cdnRegex = /(?:https?:)?\/\/?(ae\d+\.alicdn\.com\/kf\/[A-Za-z0-9_.%-]+\.(?:jpg|jpeg|png|webp))/gi
-  for (const m of html.matchAll(cdnRegex)) {
-    const normalized = `https://${m[1]}`
-    seen.add(normalized)
-    if (seen.size >= 6) break
-  }
-
-  // Padrão escapado: ae01.alicdn.com\/kf\/HASH.jpg (dentro de JSON strings)
-  if (seen.size < 2) {
-    const escapedRegex = /ae\d+\.alicdn\.com\\\/kf\\\/([A-Za-z0-9_.%-]+\.(?:jpg|jpeg|png|webp))/gi
-    for (const m of html.matchAll(escapedRegex)) {
-      seen.add(`https://ae01.alicdn.com/kf/${m[1]}`)
-      if (seen.size >= 6) break
-    }
-  }
-
-  // Fallback og:image
-  if (seen.size === 0) {
-    const ogMatch = html.match(/property="og:image"\s+content="([^"]+)"/) ||
-                    html.match(/content="([^"]+)"\s+property="og:image"/)
-    if (ogMatch?.[1]) seen.add(ogMatch[1])
-  }
-
-  const images = Array.from(seen)
-    .filter(u => u.includes('alicdn.com'))
-    .slice(0, 4)
-
-  if (images.length === 0) {
-    throw new Error('Nenhuma imagem encontrada no HTML')
-  }
-
-  return images
-}
+// Busca imagens diretamente do HTML da página AliExpress.
+// Extrai URLs ae01.alicdn.com — públicas, sem auth.
 
 export interface AliProductData {
   product_id: string
@@ -86,6 +16,69 @@ export interface AliProductData {
   seller_positive_rate: string | null
 }
 
+async function fetchAliImages(productId: string): Promise<string[]> {
+  const pageUrl = `https://www.aliexpress.com/item/${productId}.html`
+
+  const res = await fetch(pageUrl, {
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+      'Accept-Language': 'en-US,en;q=0.9',
+      'Cache-Control': 'no-cache',
+    },
+    redirect: 'follow',
+    signal: AbortSignal.timeout(20000),
+  })
+
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+
+  const html = await res.text()
+
+  if (html.length < 5000) {
+    throw new Error(`Página bloqueada (${html.length} chars)`)
+  }
+
+  const seen = new Set<string>()
+
+  // Extrai todos os caminhos ae\d+.alicdn.com/kf/HASH.ext do HTML
+  // Evita ranges complexos no character class usando [^/\s"'\\]
+  const idx = 0
+  const lines = html.split('\n')
+  for (const line of lines) {
+    const pos = line.indexOf('alicdn.com/kf/')
+    if (pos === -1) continue
+
+    // Pega o trecho antes para incluir o domínio
+    const start = Math.max(0, pos - 20)
+    const segment = line.slice(start, pos + 200)
+
+    // Regex simples sem character class problemático
+    const m = segment.match(/ae\d+\.alicdn\.com\/kf\/\S+?\.(jpg|jpeg|png|webp)/i)
+    if (m) {
+      // Limpa chars inválidos no final (", ', \, ), etc)
+      const clean = m[0].replace(/[^a-zA-Z0-9_./-]/g, '')
+      if (clean.includes('alicdn.com') && clean.length > 40) {
+        seen.add(`https://${clean}`)
+      }
+    }
+    if (seen.size >= 4) break
+  }
+  void idx
+
+  // Fallback: og:image
+  if (seen.size === 0) {
+    const og = html.match(/og:image[^>]+content="([^"]+)"/) ||
+               html.match(/content="(https:\/\/ae\d+\.alicdn\.com\/kf\/[^"]+)"/)
+    if (og?.[1]) seen.add(og[1])
+  }
+
+  const images = Array.from(seen).filter(u => u.startsWith('https://ae'))
+
+  if (images.length === 0) throw new Error('Nenhuma imagem encontrada')
+
+  return images
+}
+
 export async function GET(request: NextRequest) {
   const id = request.nextUrl.searchParams.get('id')
   if (!id || !/^\d+$/.test(id)) {
@@ -93,7 +86,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const images = await fetchProductImages(id)
+    const images = await fetchAliImages(id)
     const result: AliProductData = {
       product_id: id,
       title: null,
