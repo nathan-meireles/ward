@@ -532,7 +532,9 @@ OUTFIT: ${OUTFIT_DESC[outfitKey] ?? OUTFIT_DESC.black}. ABSOLUTELY NO blazer, ja
 
 Background: ${BG_DESC[photoConfig.background]}.
 
-${camera}. Photorealistic, ultra-detailed, SQUARE 1:1 FORMAT, no watermark, no text.`
+${camera}. Photorealistic, ultra-detailed, SQUARE 1:1 FORMAT, no watermark, no text.
+
+Avoid: ${NEGATIVE_PROMPT}`
     setPhotoPrompt({ main, negative: NEGATIVE_PROMPT })
   }
 
@@ -548,7 +550,9 @@ OUTFIT: ${OUTFIT_DESC[outfitKey] ?? OUTFIT_DESC.black}. ABSOLUTELY NO blazer, su
 
 Setting: ${SCENE_DESC[adConfig.scene]}. Lighting: soft natural light, no harsh flash.
 
-${camera}. Style: raw street editorial — real person, NOT luxury campaign, NOT studio glossy. 8K, photorealistic, SQUARE 1:1 FORMAT, no watermark.`
+${camera}. Style: raw street editorial — real person, NOT luxury campaign, NOT studio glossy. 8K, photorealistic, SQUARE 1:1 FORMAT, no watermark.
+
+Avoid: ${NEGATIVE_PROMPT}`
     setAdPrompt({ main, negative: NEGATIVE_PROMPT })
   }
 
@@ -581,12 +585,7 @@ ${camera}. Style: raw street editorial — real person, NOT luxury campaign, NOT
           <button onClick={buildPhoto} className="btn btn-primary" style={{ justifyContent: 'center', display: 'flex', alignItems: 'center', gap: 6 }}>
             <Sparkles size={11} /> {photoPrompt ? 'Regerar' : 'Gerar Prompt'}
           </button>
-          {photoPrompt && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              <PromptBlock label="Prompt" text={photoPrompt.main} accent />
-              <PromptBlock label="Negative Prompt" text={photoPrompt.negative} />
-            </div>
-          )}
+          {photoPrompt && <PromptBlock label="Prompt — copiar e colar completo" text={photoPrompt.main} accent />}
         </div>
       )}
 
@@ -602,12 +601,7 @@ ${camera}. Style: raw street editorial — real person, NOT luxury campaign, NOT
           <button onClick={buildAd} className="btn btn-primary" style={{ justifyContent: 'center', display: 'flex', alignItems: 'center', gap: 6 }}>
             <Sparkles size={11} /> {adPrompt ? 'Regerar' : 'Gerar Prompt'}
           </button>
-          {adPrompt && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              <PromptBlock label="Prompt" text={adPrompt.main} accent />
-              <PromptBlock label="Negative Prompt" text={adPrompt.negative} />
-            </div>
-          )}
+          {adPrompt && <PromptBlock label="Prompt — copiar e colar completo" text={adPrompt.main} accent />}
         </div>
       )}
 
