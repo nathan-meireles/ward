@@ -401,7 +401,7 @@ function TabEsteira({ product, onUpdate }: { product: ProductFull; onUpdate: () 
 
 type CreativeSubTab = 'produto' | 'criativo'
 interface PhotoConfig { outfitColor: 'auto'|'black'|'white'|'cream'|'caramel'; framing: 'full_body'|'mid'|'close_bag'|'holding_bag'; background: 'white'|'off_white'|'dark_marble' }
-interface AdConfig { scene: 'european_street'|'cafe'|'concrete_wall'|'night_urban'|'metro'; pose: 'walking'|'leaning'|'sitting'|'holding_up'|'standing'; framing: 'full_body'|'mid'|'close_bag' }
+interface AdConfig { scene: 'european_street'|'cafe'|'restaurant'|'concrete_wall'|'night_urban'|'metro'; pose: 'walking'|'leaning'|'sitting'|'holding_up'|'standing'; framing: 'full_body'|'mid'|'close_bag' }
 
 const LINE_DESC: Record<string, string> = {
   'Wrong Shapes': 'sculptural, geometric, unusual-format bag',
@@ -438,6 +438,7 @@ const BG_DESC: Record<string, string> = {
 const SCENE_DESC: Record<string, string> = {
   european_street: 'slightly blurred European cobblestone street, Amsterdam, autumn, warm golden daylight',
   cafe:            'European café exterior, blurred chairs and awning in background, soft morning light',
+  restaurant:      'interior of a modern European restaurant, warm ambient lighting, blurred tables and candles in background, evening atmosphere',
   concrete_wall:   'clean concrete urban wall, minimal environment, flat overcast diffused light',
   night_urban:     'European city street at dusk, warm bokeh street lights in background, wet cobblestones reflecting ambient city glow',
   metro:           'metro station entrance steps, urban architectural lines, flat artificial light',
@@ -593,7 +594,7 @@ ${camera}. Style: raw street editorial — real person, NOT luxury campaign, NOT
       {subTab === 'criativo' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <ConfigGroup label="Cenário" value={adConfig.scene} onChange={v => setAdConfig(c => ({ ...c, scene: v as AdConfig['scene'] }))}
-            options={[{ key: 'european_street', label: 'Rua Europeia' }, { key: 'cafe', label: 'Café' }, { key: 'concrete_wall', label: 'Parede' }, { key: 'night_urban', label: 'Noite Urbana' }, { key: 'metro', label: 'Metrô' }]} />
+            options={[{ key: 'european_street', label: 'Rua Europeia' }, { key: 'cafe', label: 'Café' }, { key: 'restaurant', label: 'Restaurante' }, { key: 'concrete_wall', label: 'Parede' }, { key: 'night_urban', label: 'Noite Urbana' }, { key: 'metro', label: 'Metrô' }]} />
           <ConfigGroup label="Pose" value={adConfig.pose} onChange={v => setAdConfig(c => ({ ...c, pose: v as AdConfig['pose'] }))}
             options={[{ key: 'walking', label: 'Andando' }, { key: 'leaning', label: 'Apoiada' }, { key: 'sitting', label: 'Sentada' }, { key: 'holding_up', label: 'Segurando' }, { key: 'standing', label: 'Parada' }]} />
           <ConfigGroup label="Enquadramento" value={adConfig.framing} onChange={v => setAdConfig(c => ({ ...c, framing: v as AdConfig['framing'] }))}
