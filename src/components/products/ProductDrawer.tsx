@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
-import { X, ExternalLink, TrendingUp, FlaskConical, Megaphone, Megaphone as CampIcon, ChevronRight, Save, Loader2, AlertCircle } from 'lucide-react'
+import { X, ExternalLink, TrendingUp, FlaskConical, Megaphone, Megaphone as CampIcon, ChevronRight, Save, Loader2, AlertCircle, Copy, CheckCheck, Sparkles } from 'lucide-react'
 import { calcPricing, calcVolumeProjections, fmtEur, fmtPct, DEFAULT_PRICING_CONFIG, type PricingInputs } from '@/lib/pricing'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -399,18 +399,174 @@ function TabEsteira({ product, onUpdate }: { product: ProductFull; onUpdate: () 
 
 // ─── Tab: Criativos ───────────────────────────────────────────────────────────
 
-function TabCreatives({ product }: { product: ProductFull }) {
-  if (!product.creatives?.length) {
-    return (
-      <div style={{ color: 'var(--text-4)', fontSize: 13, textAlign: 'center', padding: '24px 0' }}>
-        Nenhum criativo vinculado ainda.
-      </div>
-    )
+const LINE_DESC: Record<string, string> = {
+  'Wrong Shapes': 'sculptural, geometric, unusual-format bag',
+  'The Furred': 'fuzzy, plush, fur-textured bag',
+  'Color Riot': 'bold color-blocked, aggressively saturated bag',
+  'Not Your Garden': 'floral-patterned, embroidered botanical bag',
+  'Shell Shocked': 'shell-inspired, iridescent, marine-toned bag',
+  'The Excessive': 'rhinestone-covered, crystal-embellished, beaded bag',
+}
+
+const NEGATIVE_PROMPT = `blurry bag, wrong bag shape, wrong bag color, missing bag details, deformed bag, extra limbs, bad anatomy, distorted face, artificial skin, overly smooth skin, plastic look, studio backdrop, white background, luxury editorial, stiff model pose, watermark, text, logo, low quality, pixelated, overexposed, CGI, multiple bags, fashion week aesthetic, glossy magazine look`
+
+interface BananaPrompts {
+  main: string
+  negative: string
+  variations: Array<{ label: string; prompt: string }>
+}
+
+function buildPrompts(product: ProductFull): BananaPrompts {
+  const traits = (product.notreglr_visual_traits ?? []).slice(0, 4)
+  const line = product.line_name ?? product.line_category ?? 'Wrong Shapes'
+  const lineDesc = LINE_DESC[line] ?? 'statement bag'
+  const bagDesc = [lineDesc, ...traits].filter(Boolean).join(', ')
+  const nameNote = product.product_name ? ` ("${product.product_name}")` : ''
+
+  const subject = `Young woman with white skin, naturally curly hair, casual European street style — preserve exact facial features, skin tone and hair texture from reference photo`
+  const bag = `She is carrying the exact bag${nameNote} from the product reference image, clearly visible and prominently placed in frame. Bag: ${bagDesc}`
+  const camera = `Shot on 85mm f/1.8, shallow depth of field, Canon EOS R5`
+  const style = `Style: raw editorial street photography — real person energy, NOT luxury fashion campaign, NOT studio glossy, NOT model pose. Ultra-detailed, photorealistic, 4K, RAW photo, no artifacts`
+
+  const main = `${subject}. ${bag}. Background: slightly blurred European cobblestone street, autumn atmosphere. Posture: natural, casual, mid-stride, as if caught by a street photographer. Lighting: soft natural daylight, warm golden tones, no harsh shadows. ${camera}. ${style}.`
+
+  const vars = [
+    {
+      label: 'Variação 1 — Rua, andando',
+      outfit: 'oversized cream linen shirt, straight-leg dark jeans, white sneakers',
+      action: 'walking confidently mid-stride, bag on shoulder',
+      setting: 'slightly blurred cobblestone European street, Amsterdam, autumn',
+      light: 'soft natural daylight, warm golden tones',
+    },
+    {
+      label: 'Variação 2 — Parede, parada',
+      outfit: 'black turtleneck, wide-leg trousers, flat mules',
+      action: 'leaning against a concrete wall, arms relaxed, bag held by top handle at side',
+      setting: 'clean concrete urban wall, minimal background',
+      light: 'overcast flat light, even and diffused, no harsh shadows',
+    },
+    {
+      label: 'Variação 3 — Café exterior',
+      outfit: 'cropped denim jacket, white tee, wide-leg pants',
+      action: 'sitting at outdoor café table, bag placed on table in front, looking slightly off-camera',
+      setting: 'European café exterior, blurred chairs and awning',
+      light: 'soft morning light, warm and natural',
+    },
+    {
+      label: 'Variação 4 — Close na bolsa',
+      outfit: 'olive green oversized coat, minimal jewelry',
+      action: 'close-up shot, hand holding bag up by strap toward camera, face partially visible in background, bag center-frame',
+      setting: 'neutral wall or metro steps, city environment',
+      light: 'crisp natural light, slight contrast, clean shadows',
+    },
+  ]
+
+  return {
+    main,
+    negative: NEGATIVE_PROMPT,
+    variations: vars.map(v => ({
+      label: v.label,
+      prompt: `${subject}, wearing ${v.outfit}, ${v.action}. ${bag}. Setting: ${v.setting}. Lighting: ${v.light}. ${camera}. ${style}.`,
+    })),
+  }
+}
+
+function CopyButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false)
+  function copy() {
+    navigator.clipboard.writeText(text)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
   }
   return (
-    <div style={{ fontSize: 13, color: 'var(--text-3)' }}>
-      {product.creatives.length} criativo(s) vinculado(s).
-      {/* TODO: lista de criativos com detalhes */}
+    <button onClick={copy} className="btn btn-ghost" style={{ fontSize: 11, padding: '3px 10px', display: 'flex', alignItems: 'center', gap: 5 }}>
+      {copied ? <><CheckCheck size={11} /> Copiado</> : <><Copy size={11} /> Copiar</>}
+    </button>
+  )
+}
+
+function PromptBlock({ label, text, accent }: { label: string; text: string; accent?: boolean }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <span style={{ fontSize: 9, color: accent ? 'var(--brand)' : 'var(--text-4)', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '0.12em' }}>
+          {label}
+        </span>
+        <CopyButton text={text} />
+      </div>
+      <div style={{
+        background: 'var(--surface-2)', border: `1px solid ${accent ? 'var(--brand-dim)' : 'var(--border)'}`,
+        borderRadius: 'var(--radius-sm)', padding: '10px 12px',
+        fontSize: 11, color: 'var(--text-3)', lineHeight: 1.6,
+        fontFamily: 'var(--font)', whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+      }}>
+        {text}
+      </div>
+    </div>
+  )
+}
+
+function TabCreatives({ product }: { product: ProductFull }) {
+  const [prompts, setPrompts] = useState<BananaPrompts | null>(null)
+
+  function generate() {
+    setPrompts(buildPrompts(product))
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+
+      {/* Gerador de prompts Nano Banana */}
+      <div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+          <div style={{ fontSize: 10, color: 'var(--text-4)', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+            Prompts — Nano Banana
+          </div>
+          <button onClick={generate} className="btn btn-primary" style={{ fontSize: 11, padding: '4px 12px', display: 'flex', alignItems: 'center', gap: 6 }}>
+            <Sparkles size={11} /> {prompts ? 'Regerar' : 'Gerar Prompts'}
+          </button>
+        </div>
+
+        {!prompts && (
+          <div style={{ color: 'var(--text-4)', fontSize: 12, textAlign: 'center', padding: '20px 0', border: '1px dashed var(--border)', borderRadius: 'var(--radius)' }}>
+            Clique em "Gerar Prompts" para criar os prompts de imagem com a Stef + este produto.
+          </div>
+        )}
+
+        {prompts && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <PromptBlock label="Prompt Principal" text={prompts.main} accent />
+            <PromptBlock label="Negative Prompt" text={prompts.negative} />
+
+            <div style={{ borderTop: '1px solid var(--border)', paddingTop: 14 }}>
+              <div style={{ fontSize: 9, color: 'var(--text-4)', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: 12 }}>
+                Variações (trocar roupa, pose e cenário)
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {prompts.variations.map(v => (
+                  <PromptBlock key={v.label} label={v.label} text={v.prompt} />
+                ))}
+              </div>
+            </div>
+
+            <div style={{ background: 'var(--surface-2)', borderRadius: 'var(--radius-sm)', padding: '10px 12px', fontSize: 11, color: 'var(--text-4)', lineHeight: 1.6 }}>
+              <strong style={{ color: 'var(--text-3)' }}>Como usar:</strong> suba a foto da Stef como referência 1 (peso maior) e a foto da bolsa como referência 2. Use o Prompt Principal ou uma das Variações. Negative Prompt vai no campo separado.
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Criativos vinculados */}
+      {product.creatives?.length > 0 && (
+        <div style={{ borderTop: '1px solid var(--border)', paddingTop: 16 }}>
+          <div style={{ fontSize: 10, color: 'var(--text-4)', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 8 }}>
+            Criativos Vinculados
+          </div>
+          <div style={{ fontSize: 13, color: 'var(--text-3)' }}>
+            {product.creatives.length} criativo(s) vinculado(s).
+          </div>
+        </div>
+      )}
     </div>
   )
 }
