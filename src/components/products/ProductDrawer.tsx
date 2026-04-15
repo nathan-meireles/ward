@@ -399,6 +399,10 @@ function TabEsteira({ product, onUpdate }: { product: ProductFull; onUpdate: () 
 
 // ─── Tab: Criativos ───────────────────────────────────────────────────────────
 
+type CreativeSubTab = 'produto' | 'criativo'
+interface PhotoConfig { outfitColor: 'auto'|'black'|'white'|'cream'|'caramel'; framing: 'full_body'|'mid'|'close_bag'|'holding_bag'; background: 'white'|'off_white'|'dark_marble' }
+interface AdConfig { scene: 'european_street'|'cafe'|'concrete_wall'|'night_urban'|'metro'; pose: 'walking'|'leaning'|'sitting'|'holding_up'|'standing'; framing: 'full_body'|'mid'|'close_bag' }
+
 const LINE_DESC: Record<string, string> = {
   'Wrong Shapes': 'sculptural, geometric, unusual-format bag',
   'The Furred': 'fuzzy, plush, fur-textured bag',
@@ -408,76 +412,63 @@ const LINE_DESC: Record<string, string> = {
   'The Excessive': 'rhinestone-covered, crystal-embellished, beaded bag',
 }
 
-const NEGATIVE_PROMPT = `blurry bag, wrong bag shape, wrong bag color, missing bag details, deformed bag, extra limbs, bad anatomy, distorted face, artificial skin, overly smooth skin, plastic look, studio backdrop, white background, luxury editorial, stiff model pose, watermark, text, logo, low quality, pixelated, overexposed, CGI, multiple bags, fashion week aesthetic, glossy magazine look`
+const NEGATIVE_PROMPT = `blurry bag, wrong bag shape, wrong bag color, missing bag details, deformed bag, extra limbs, bad anatomy, distorted face, artificial skin, overly smooth skin, plastic look, luxury editorial, stiff model pose, watermark, text, logo, low quality, pixelated, overexposed, CGI, multiple bags, fashion week aesthetic, glossy magazine look, blazer, suit, elegant coat`
 
-interface BananaPrompts {
-  main: string
-  negative: string
-  variations: Array<{ label: string; prompt: string }>
+const OUTFIT_DESC: Record<string, string> = {
+  black:   'black fitted turtleneck, straight black wide-leg trousers, black ankle boots — ALL BLACK, no other colors',
+  white:   'white minimalist fitted top, straight white wide-leg trousers, white sneakers — ALL WHITE, no patterns',
+  cream:   'cream oversized knit top, cream wide-leg trousers, nude mules — ALL CREAM, no patterns',
+  caramel: 'caramel ribbed knit sweater, caramel wide-leg trousers, tan leather boots — ALL CARAMEL TONES',
+  off_white: 'off-white oversized shirt, off-white wide-leg trousers, white sneakers — ALL OFF-WHITE, no patterns',
 }
 
-function buildPrompts(product: ProductFull): BananaPrompts {
-  const traits = (product.notreglr_visual_traits ?? []).slice(0, 4)
-  const line = product.line_name ?? product.line_category ?? 'Wrong Shapes'
-  const lineDesc = LINE_DESC[line] ?? 'statement bag'
-  const bagDesc = [lineDesc, ...traits].filter(Boolean).join(', ')
-  const nameNote = product.product_name ? ` ("${product.product_name}")` : ''
+const FRAMING_PHOTO: Record<string, string> = {
+  full_body:   'Full body shot from head to toe — model and bag fully visible',
+  mid:         'Mid-shot from waist up — model and bag both clearly visible',
+  close_bag:   'Close-up focused on the bag and hands — torso visible, face softly blurred in background, bag center frame',
+  holding_bag: 'Close-up of hands holding the bag up toward camera — bag fills center frame, model\'s lower face and torso softly visible behind',
+}
 
-  const subject = `Young woman with white skin, naturally curly hair, casual European street style — preserve exact facial features, skin tone and hair texture from reference photo`
-  const bag = `She is carrying the exact bag${nameNote} from the product reference image, clearly visible and prominently placed in frame. Bag: ${bagDesc}`
-  const camera = `Shot on 85mm f/1.8, shallow depth of field, Canon EOS R5`
-  const style = `Style: raw editorial street photography — real person energy, NOT luxury fashion campaign, NOT studio glossy, NOT model pose. Ultra-detailed, photorealistic, 4K, RAW photo, no artifacts`
+const BG_DESC: Record<string, string> = {
+  white:       'clean pure white seamless background, soft diffused studio lighting, no shadows',
+  off_white:   'clean off-white seamless background (#F9F9F6), soft natural window light from left, gentle shadow on right',
+  dark_marble: 'smooth dark grey marble surface, deep black background, two-point studio softbox lighting with subtle specular highlights on bag',
+}
 
-  const main = `${subject}. ${bag}. Background: slightly blurred European cobblestone street, autumn atmosphere. Posture: natural, casual, mid-stride, as if caught by a street photographer. Lighting: soft natural daylight, warm golden tones, no harsh shadows. ${camera}. ${style}.`
+const SCENE_DESC: Record<string, string> = {
+  european_street: 'slightly blurred European cobblestone street, Amsterdam, autumn, warm golden daylight',
+  cafe:            'European café exterior, blurred chairs and awning in background, soft morning light',
+  concrete_wall:   'clean concrete urban wall, minimal environment, flat overcast diffused light',
+  night_urban:     'European city street at dusk, warm bokeh street lights in background, wet cobblestones reflecting ambient city glow',
+  metro:           'metro station entrance steps, urban architectural lines, flat artificial light',
+}
 
-  const vars = [
-    {
-      label: 'Variação 1 — Rua, andando',
-      outfit: 'oversized cream linen shirt, straight-leg dark jeans, white sneakers',
-      action: 'walking confidently mid-stride, bag on shoulder',
-      setting: 'slightly blurred cobblestone European street, Amsterdam, autumn',
-      light: 'soft natural daylight, warm golden tones',
-    },
-    {
-      label: 'Variação 2 — Parede, parada',
-      outfit: 'black turtleneck, wide-leg trousers, flat mules',
-      action: 'leaning against a concrete wall, arms relaxed, bag held by top handle at side',
-      setting: 'clean concrete urban wall, minimal background',
-      light: 'overcast flat light, even and diffused, no harsh shadows',
-    },
-    {
-      label: 'Variação 3 — Café exterior',
-      outfit: 'cropped denim jacket, white tee, wide-leg pants',
-      action: 'sitting at outdoor café table, bag placed on table in front, looking slightly off-camera',
-      setting: 'European café exterior, blurred chairs and awning',
-      light: 'soft morning light, warm and natural',
-    },
-    {
-      label: 'Variação 4 — Close na bolsa',
-      outfit: 'olive green oversized coat, minimal jewelry',
-      action: 'close-up shot, hand holding bag up by strap toward camera, face partially visible in background, bag center-frame',
-      setting: 'neutral wall or metro steps, city environment',
-      light: 'crisp natural light, slight contrast, clean shadows',
-    },
-  ]
+const POSE_DESC: Record<string, string> = {
+  walking:    'walking naturally mid-stride, as if caught by a street photographer, bag moving naturally',
+  leaning:    'leaning against wall, arms relaxed, weight on one side, bag at side or crossbody',
+  sitting:    'sitting at outdoor table or steps, bag on lap or placed in front, relaxed posture',
+  holding_up: 'holding bag up by strap toward camera, bag fills most of frame, face partially visible behind',
+  standing:   'standing with slight weight shift to one hip, relaxed confidence, bag crossbody or at side',
+}
 
-  return {
-    main,
-    negative: NEGATIVE_PROMPT,
-    variations: vars.map(v => ({
-      label: v.label,
-      prompt: `${subject}, wearing ${v.outfit}, ${v.action}. ${bag}. Setting: ${v.setting}. Lighting: ${v.light}. ${camera}. ${style}.`,
-    })),
-  }
+const FRAMING_AD: Record<string, string> = {
+  full_body: 'Full body shot — head to toe, model and bag fully visible',
+  mid:       'Mid-shot from waist up — bag and model clearly visible',
+  close_bag: 'Close-up centered on bag — hands and torso visible, face softly blurred',
+}
+
+function getAutoOutfit(line: string | null, traits: string[]): string {
+  const t = traits.join(' ').toLowerCase()
+  if (!line) return 'black'
+  if (['The Excessive', 'Color Riot', 'Shell Shocked', 'Not Your Garden'].includes(line)) return 'black'
+  if (line === 'The Furred') return (t.includes('white') || t.includes('light') || t.includes('bege') || t.includes('creme')) ? 'black' : 'off_white'
+  if (line === 'Wrong Shapes') return (t.includes('black') || t.includes('dark') || t.includes('preto') || t.includes('escuro')) ? 'cream' : 'black'
+  return 'black'
 }
 
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false)
-  function copy() {
-    navigator.clipboard.writeText(text)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
-  }
+  function copy() { navigator.clipboard.writeText(text); setCopied(true); setTimeout(() => setCopied(false), 2000) }
   return (
     <button onClick={copy} className="btn btn-ghost" style={{ fontSize: 11, padding: '3px 10px', display: 'flex', alignItems: 'center', gap: 5 }}>
       {copied ? <><CheckCheck size={11} /> Copiado</> : <><Copy size={11} /> Copiar</>}
@@ -489,82 +480,141 @@ function PromptBlock({ label, text, accent }: { label: string; text: string; acc
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <span style={{ fontSize: 9, color: accent ? 'var(--brand)' : 'var(--text-4)', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '0.12em' }}>
-          {label}
-        </span>
+        <span style={{ fontSize: 9, color: accent ? 'var(--brand)' : 'var(--text-4)', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '0.12em' }}>{label}</span>
         <CopyButton text={text} />
       </div>
-      <div style={{
-        background: 'var(--surface-2)', border: `1px solid ${accent ? 'var(--brand-dim)' : 'var(--border)'}`,
-        borderRadius: 'var(--radius-sm)', padding: '10px 12px',
-        fontSize: 11, color: 'var(--text-3)', lineHeight: 1.6,
-        fontFamily: 'var(--font)', whiteSpace: 'pre-wrap', wordBreak: 'break-word',
-      }}>
+      <div style={{ background: 'var(--surface-2)', border: `1px solid ${accent ? 'var(--brand-dim)' : 'var(--border)'}`, borderRadius: 'var(--radius-sm)', padding: '10px 12px', fontSize: 11, color: 'var(--text-3)', lineHeight: 1.6, fontFamily: 'var(--font)', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
         {text}
       </div>
     </div>
   )
 }
 
-function TabCreatives({ product }: { product: ProductFull }) {
-  const [prompts, setPrompts] = useState<BananaPrompts | null>(null)
+function ConfigGroup({ label, options, value, onChange }: { label: string; options: { key: string; label: string }[]; value: string; onChange: (v: string) => void }) {
+  return (
+    <div>
+      <div style={{ fontSize: 9, color: 'var(--text-4)', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: 6 }}>{label}</div>
+      <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+        {options.map(o => (
+          <button key={o.key} onClick={() => onChange(o.key)} style={{ padding: '4px 10px', fontSize: 11, border: `1px solid ${value === o.key ? 'var(--brand)' : 'var(--border)'}`, borderRadius: 'var(--radius-sm)', background: value === o.key ? 'var(--brand-dim)' : 'var(--surface-2)', color: value === o.key ? 'var(--brand)' : 'var(--text-3)', cursor: 'pointer', fontFamily: 'var(--font)', transition: 'all 0.15s' }}>
+            {o.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
 
-  function generate() {
-    setPrompts(buildPrompts(product))
+function TabCreatives({ product }: { product: ProductFull }) {
+  const [subTab, setSubTab] = useState<CreativeSubTab>('produto')
+  const [photoConfig, setPhotoConfig] = useState<PhotoConfig>({ outfitColor: 'auto', framing: 'mid', background: 'off_white' })
+  const [photoPrompt, setPhotoPrompt] = useState<{ main: string; negative: string } | null>(null)
+  const [adConfig, setAdConfig] = useState<AdConfig>({ scene: 'european_street', pose: 'walking', framing: 'full_body' })
+  const [adPrompt, setAdPrompt] = useState<{ main: string; negative: string } | null>(null)
+
+  const line = product.line_name ?? product.line_category ?? 'Wrong Shapes'
+  const traits = product.notreglr_visual_traits ?? []
+  const bagDesc = [LINE_DESC[line] ?? 'statement bag', ...traits.slice(0, 3)].filter(Boolean).join(', ')
+  const nameNote = product.product_name ? ` ("${product.product_name}")` : ''
+  const bagRef = `the exact bag${nameNote} from the bag reference photo — ${bagDesc}`
+  const camera = `Shot on 85mm f/1.8, Canon EOS R5, shallow depth of field`
+
+  function buildPhoto() {
+    const outfitKey = photoConfig.outfitColor === 'auto' ? getAutoOutfit(line, traits) : photoConfig.outfitColor
+    const main = `Using the bag photo as the exact product to reproduce — preserve every detail of ${bagRef}. Do not alter shape, colors, texture or any feature.
+
+Generate a woman, late 20s to early 30s, unconventional European beauty — NOT a generic fashion model look. Natural, confident expression. Real person energy.
+
+${FRAMING_PHOTO[photoConfig.framing]}.
+
+OUTFIT: ${OUTFIT_DESC[outfitKey] ?? OUTFIT_DESC.black}. ABSOLUTELY NO blazer, jacket, suit or elegant coat. The bag is the only statement.
+
+Background: ${BG_DESC[photoConfig.background]}.
+
+${camera}. Photorealistic, ultra-detailed, SQUARE 1:1 FORMAT, no watermark, no text.`
+    setPhotoPrompt({ main, negative: NEGATIVE_PROMPT })
   }
 
+  function buildAd() {
+    const outfitKey = getAutoOutfit(line, traits)
+    const main = `Using the bag photo as the exact product to reproduce — preserve every detail of ${bagRef}. Do not alter.
+
+Generate a woman, late 20s to early 30s, unconventional European beauty, NOT a conventional model. Confident, slightly indifferent expression. Real person energy.
+
+${FRAMING_AD[adConfig.framing]}. She is ${POSE_DESC[adConfig.pose]}. She is carrying the bag from the reference photo, clearly visible in frame.
+
+OUTFIT: ${OUTFIT_DESC[outfitKey] ?? OUTFIT_DESC.black}. ABSOLUTELY NO blazer, suit or elegant coat.
+
+Setting: ${SCENE_DESC[adConfig.scene]}. Lighting: soft natural light, no harsh flash.
+
+${camera}. Style: raw street editorial — real person, NOT luxury campaign, NOT studio glossy. 8K, photorealistic, SQUARE 1:1 FORMAT, no watermark.`
+    setAdPrompt({ main, negative: NEGATIVE_PROMPT })
+  }
+
+  const subBtnStyle = (active: boolean): React.CSSProperties => ({
+    flex: 1, padding: '6px 0', fontSize: 11, border: 'none', cursor: 'pointer',
+    borderRadius: 'var(--radius-sm)', fontFamily: 'var(--font-mono)', letterSpacing: '0.05em',
+    background: active ? 'var(--brand-dim)' : 'transparent',
+    color: active ? 'var(--brand)' : 'var(--text-3)',
+    fontWeight: active ? 600 : 400, transition: 'all 0.15s',
+  })
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
-      {/* Gerador de prompts Nano Banana */}
-      <div>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-          <div style={{ fontSize: 10, color: 'var(--text-4)', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
-            Prompts — Nano Banana
-          </div>
-          <button onClick={generate} className="btn btn-primary" style={{ fontSize: 11, padding: '4px 12px', display: 'flex', alignItems: 'center', gap: 6 }}>
-            <Sparkles size={11} /> {prompts ? 'Regerar' : 'Gerar Prompts'}
-          </button>
-        </div>
-
-        {!prompts && (
-          <div style={{ color: 'var(--text-4)', fontSize: 12, textAlign: 'center', padding: '20px 0', border: '1px dashed var(--border)', borderRadius: 'var(--radius)' }}>
-            Clique em "Gerar Prompts" para criar os prompts de imagem com a Stef + este produto.
-          </div>
-        )}
-
-        {prompts && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-            <PromptBlock label="Prompt Principal" text={prompts.main} accent />
-            <PromptBlock label="Negative Prompt" text={prompts.negative} />
-
-            <div style={{ borderTop: '1px solid var(--border)', paddingTop: 14 }}>
-              <div style={{ fontSize: 9, color: 'var(--text-4)', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: 12 }}>
-                Variações (trocar roupa, pose e cenário)
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {prompts.variations.map(v => (
-                  <PromptBlock key={v.label} label={v.label} text={v.prompt} />
-                ))}
-              </div>
-            </div>
-
-            <div style={{ background: 'var(--surface-2)', borderRadius: 'var(--radius-sm)', padding: '10px 12px', fontSize: 11, color: 'var(--text-4)', lineHeight: 1.6 }}>
-              <strong style={{ color: 'var(--text-3)' }}>Como usar:</strong> suba a foto da Stef como referência 1 (peso maior) e a foto da bolsa como referência 2. Use o Prompt Principal ou uma das Variações. Negative Prompt vai no campo separado.
-            </div>
-          </div>
-        )}
+      {/* Sub-tabs */}
+      <div style={{ display: 'flex', gap: 2, background: 'var(--surface-2)', padding: 3, borderRadius: 'var(--radius-sm)' }}>
+        <button style={subBtnStyle(subTab === 'produto')} onClick={() => setSubTab('produto')}>Fotos do Produto</button>
+        <button style={subBtnStyle(subTab === 'criativo')} onClick={() => setSubTab('criativo')}>Criativos para Ads</button>
       </div>
+
+      {/* ── FOTOS DO PRODUTO ── */}
+      {subTab === 'produto' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <ConfigGroup label="Enquadramento" value={photoConfig.framing} onChange={v => setPhotoConfig(c => ({ ...c, framing: v as PhotoConfig['framing'] }))}
+            options={[{ key: 'full_body', label: 'Corpo todo' }, { key: 'mid', label: 'Meio corpo' }, { key: 'close_bag', label: 'Close bolsa' }, { key: 'holding_bag', label: 'Segurando' }]} />
+          <ConfigGroup label="Roupa" value={photoConfig.outfitColor} onChange={v => setPhotoConfig(c => ({ ...c, outfitColor: v as PhotoConfig['outfitColor'] }))}
+            options={[{ key: 'auto', label: 'Auto' }, { key: 'black', label: 'Preto' }, { key: 'white', label: 'Branco' }, { key: 'cream', label: 'Creme' }, { key: 'caramel', label: 'Caramelo' }]} />
+          <ConfigGroup label="Fundo" value={photoConfig.background} onChange={v => setPhotoConfig(c => ({ ...c, background: v as PhotoConfig['background'] }))}
+            options={[{ key: 'white', label: 'Branco' }, { key: 'off_white', label: 'Off-white' }, { key: 'dark_marble', label: 'Mármore' }]} />
+          <button onClick={buildPhoto} className="btn btn-primary" style={{ justifyContent: 'center', display: 'flex', alignItems: 'center', gap: 6 }}>
+            <Sparkles size={11} /> {photoPrompt ? 'Regerar' : 'Gerar Prompt'}
+          </button>
+          {photoPrompt && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <PromptBlock label="Prompt" text={photoPrompt.main} accent />
+              <PromptBlock label="Negative Prompt" text={photoPrompt.negative} />
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── CRIATIVOS PARA ADS ── */}
+      {subTab === 'criativo' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <ConfigGroup label="Cenário" value={adConfig.scene} onChange={v => setAdConfig(c => ({ ...c, scene: v as AdConfig['scene'] }))}
+            options={[{ key: 'european_street', label: 'Rua Europeia' }, { key: 'cafe', label: 'Café' }, { key: 'concrete_wall', label: 'Parede' }, { key: 'night_urban', label: 'Noite Urbana' }, { key: 'metro', label: 'Metrô' }]} />
+          <ConfigGroup label="Pose" value={adConfig.pose} onChange={v => setAdConfig(c => ({ ...c, pose: v as AdConfig['pose'] }))}
+            options={[{ key: 'walking', label: 'Andando' }, { key: 'leaning', label: 'Apoiada' }, { key: 'sitting', label: 'Sentada' }, { key: 'holding_up', label: 'Segurando' }, { key: 'standing', label: 'Parada' }]} />
+          <ConfigGroup label="Enquadramento" value={adConfig.framing} onChange={v => setAdConfig(c => ({ ...c, framing: v as AdConfig['framing'] }))}
+            options={[{ key: 'full_body', label: 'Corpo todo' }, { key: 'mid', label: 'Meio corpo' }, { key: 'close_bag', label: 'Close bolsa' }]} />
+          <button onClick={buildAd} className="btn btn-primary" style={{ justifyContent: 'center', display: 'flex', alignItems: 'center', gap: 6 }}>
+            <Sparkles size={11} /> {adPrompt ? 'Regerar' : 'Gerar Prompt'}
+          </button>
+          {adPrompt && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <PromptBlock label="Prompt" text={adPrompt.main} accent />
+              <PromptBlock label="Negative Prompt" text={adPrompt.negative} />
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Criativos vinculados */}
       {product.creatives?.length > 0 && (
         <div style={{ borderTop: '1px solid var(--border)', paddingTop: 16 }}>
-          <div style={{ fontSize: 10, color: 'var(--text-4)', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 8 }}>
-            Criativos Vinculados
-          </div>
-          <div style={{ fontSize: 13, color: 'var(--text-3)' }}>
-            {product.creatives.length} criativo(s) vinculado(s).
-          </div>
+          <div style={{ fontSize: 10, color: 'var(--text-4)', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 8 }}>Criativos Vinculados</div>
+          <div style={{ fontSize: 13, color: 'var(--text-3)' }}>{product.creatives.length} criativo(s) vinculado(s).</div>
         </div>
       )}
     </div>
